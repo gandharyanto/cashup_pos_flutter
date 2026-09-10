@@ -130,7 +130,7 @@ Widget-per-file, page-per-file. A page's private sub-widgets live in the page fi
   - `class Money { static String format(double amount, {bool withSymbol = true, int decimals = 0}); static String formatCompact(double amount); }`
   - `class PosDates { static DateTime? parse(String raw); static String display(DateTime d); static String time(DateTime d); static String apiDate(DateTime d); }`
 
-- [ ] **Step 1: Write the failing helper tests**
+- [x] **Step 1: Write the failing helper tests**
 
 ```dart
 // test/util/num_utils_test.dart
@@ -224,12 +224,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `flutter test test/util`
 Expected: FAIL — `currency.dart` and `pos_date_utils.dart` do not exist.
 
-- [ ] **Step 3: Create `analysis_options.yaml`**
+- [x] **Step 3: Create `analysis_options.yaml`**
 
 ```yaml
 include: package:flutter_lints/flutter.yaml
@@ -250,7 +250,7 @@ linter:
     - use_super_parameters
 ```
 
-- [ ] **Step 4: Implement `lib/src/util/currency.dart`**
+- [x] **Step 4: Implement `lib/src/util/currency.dart`**
 
 ```dart
 import 'package:intl/intl.dart';
@@ -297,7 +297,7 @@ class Money {
 }
 ```
 
-- [ ] **Step 5: Implement `lib/src/util/pos_date_utils.dart`**
+- [x] **Step 5: Implement `lib/src/util/pos_date_utils.dart`**
 
 ```dart
 import 'package:intl/intl.dart';
@@ -353,12 +353,12 @@ class PosDates {
 }
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `flutter test test/util` — Expected: PASS
 Run: `flutter analyze` — Expected: no issues
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pubspec.yaml analysis_options.yaml lib/src/util test/util
