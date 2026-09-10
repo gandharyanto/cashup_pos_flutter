@@ -799,7 +799,7 @@ git commit -m "feat(models): transaction, discount, promotion and report models"
 
 All of these are immutable with `const` constructors where possible. `CartItemData` implements `==`/`hashCode` over all fields — the checkout memoisation fingerprint in Task 22 depends on it.
 
-- [ ] **Step 1: Write the failing rounding test**
+- [x] **Step 1: Write the failing rounding test**
 
 ```dart
 // test/calc/rounding_utils_test.dart
@@ -834,11 +834,11 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `flutter test test/calc/rounding_utils_test.dart` — Expected: FAIL.
 
-- [ ] **Step 3: Implement `rounding_utils.dart`**
+- [x] **Step 3: Implement `rounding_utils.dart`**
 
 ```dart
 import '../util/num_utils.dart';
@@ -874,15 +874,15 @@ class RoundingUtils {
 }
 ```
 
-- [ ] **Step 4: Implement `calculator_models.dart`**
+- [x] **Step 4: Implement `calculator_models.dart`**
 
 Port each nested data class from the top of `TransactionCalculator.kt`, preserving field names and defaults exactly. Keep the doc comments — they record backend behaviour and are the reason several fields exist.
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `flutter test test/calc` — Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/src/calc test/calc
