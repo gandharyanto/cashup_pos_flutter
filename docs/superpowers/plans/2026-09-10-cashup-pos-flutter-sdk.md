@@ -1121,24 +1121,24 @@ git commit -m "feat(calc): isolated buy-x-get-y reward strategies"
 - `buildAvailableRewardItems` — subtracts reserved units for price selection; multi-line overlap reserves the **most expensive** first (they become qualifiers), leaving the cheapest available as rewards.
 - `resolveRewardItems` — honours `selectedRewardQtyMap` only when `rewardScope != 'ALL'` and enough buy-scope quantity remains after the selection; otherwise falls back to the auto-selected pool.
 
-- [ ] **Step 1: Port `BuyXGetYEvaluatorTest.kt`**
+- [x] **Step 1: Port `BuyXGetYEvaluatorTest.kt`**
 
 ```bash
 cd /d/gandha_cashup/projects/mobile-apps-cashlez
 git show origin/feature/pos-asg-phase3:pos-core/src/test/java/com/cz/pos_core/util/promotion/buyxgety/BuyXGetYEvaluatorTest.kt
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `flutter test test/calc/promotion/buyxgety/buy_x_get_y_evaluator_test.dart` — Expected: FAIL.
 
-- [ ] **Step 3: Implement the evaluator**
+- [x] **Step 3: Implement the evaluator**
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `flutter test test/calc` — Expected: PASS (whole engine suite, not just this file — the shared helpers are exactly where regressions land).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/calc/promotion/buyxgety test/calc/promotion/buyxgety
