@@ -1172,19 +1172,19 @@ Kotlin returns a `Triple` from `evaluateAll`; Dart gets the named class above in
 6. `canCombine == false` stops evaluation after that promo applies.
 7. `computeAllPerItemDeductions` and `computeAllItemRoles` rescale `DISCOUNT_BY_ORDER`'s per-item shares to the authoritative sequential total from `perPromoAmounts`; other types keep scale 1.0.
 
-- [ ] **Step 1: Port `PromotionOrchestratorTest.kt`**
+- [x] **Step 1: Port `PromotionOrchestratorTest.kt`**
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `flutter test test/calc/promotion/promotion_orchestrator_test.dart` — Expected: FAIL.
 
-- [ ] **Step 3: Implement the orchestrator**
+- [x] **Step 3: Implement the orchestrator**
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `flutter test test/calc` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/calc/promotion test/calc/promotion
