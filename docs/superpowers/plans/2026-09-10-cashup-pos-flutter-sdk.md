@@ -395,7 +395,7 @@ git commit -m "feat(util): rounding, currency and date helpers with JVM-parity r
   - `class PaymentSetting { final int paymentSettingId; final bool isPriceIncludeTax, isRounding, isServiceCharge, isTax; final int roundingTarget; final String roundingType, taxName; final double serviceChargePercentage, serviceChargeAmount, taxPercentage; final String? receiptFooterText; }`
   - `class PosPaymentMethod { final String code, name; final String? category, paymentType, provider; final int displayOrder; }`
 
-- [ ] **Step 1: Write the failing model test**
+- [x] **Step 1: Write the failing model test**
 
 ```dart
 // test/models/catalog_models_test.dart
@@ -459,12 +459,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `flutter test test/models/catalog_models_test.dart`
 Expected: FAIL — models do not exist.
 
-- [ ] **Step 3: Implement the models**
+- [x] **Step 3: Implement the models**
 
 Read each Kotlin data class and mirror its fields, keeping the backend's JSON keys. Example, showing the required shape — every other model follows it:
 
@@ -637,11 +637,11 @@ Apply the same pattern to `PosCategory`, `OptionGroup` / `OptionItem` / `Variant
 
 Do **not** port `DummyVariantDataProvider` — it is test scaffolding from the Kotlin tree and has no place in a shipped SDK.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `flutter test test/models/catalog_models_test.dart` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/models test/models
@@ -687,7 +687,7 @@ git commit -m "feat(models): catalogue, option group and payment setting models"
 | `PromotionItem.minPurchase` | `minimumSubtotal` |
 | `PromotionItem.rewardQty` | `rewardQty` (maps to the calculator's `getQty`) |
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```dart
 // test/models/transaction_models_test.dart
@@ -752,22 +752,22 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `flutter test test/models/transaction_models_test.dart` — Expected: FAIL, models missing.
 
-- [ ] **Step 3: Implement the models**
+- [x] **Step 3: Implement the models**
 
 Follow the Task 2 pattern. Two rules specific to this task:
 
 1. `toJson()` **omits null optional fields** rather than emitting `null` — the Kotlin client uses Gson defaults which drop nulls, and the backend validator treats an explicit `null` differently from an absent key. Build the map then `..removeWhere((_, v) => v == null)` for the optional block only.
 2. `PromotionItem.fromJson` reproduces the id fallback from `PosCartViewModel.toPromotionInputs`: `buyProductIds` if non-empty, else ids extracted from `buyProducts`; same for categories and rewards.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `flutter test test/models` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/models test/models
