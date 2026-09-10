@@ -49,14 +49,15 @@ void main() {
       expect(line(1, price: 18000, qty: 3).lineSubtotal, 54000);
     });
 
-    test('cartKey defaults to the product id', () {
+    test('cartKey is required, so a line can never silently collide', () {
       const item = CartItemData(
         productId: 7,
         productName: 'Teh',
         price: 8000,
         quantity: 1,
+        cartKey: '7_v3',
       );
-      expect(item.cartKey, '7');
+      expect(item.cartKey, '7_v3');
     });
 
     test('copyWith replaces only the quantity', () {

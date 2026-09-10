@@ -20,6 +20,7 @@ class CartItemData {
     required this.productName,
     required this.price,
     required this.quantity,
+    required this.cartKey,
     double? basePrice,
     this.taxAmountPerUnit = 0,
     this.isTaxable = false,
@@ -30,11 +31,9 @@ class CartItemData {
     this.selectedVariants = const [],
     this.selectedModifiers = const [],
     this.categoryIds = const [],
-    String? cartKey,
     this.isPriceAdjustable = false,
     this.isPriceOverride = false,
-  }) : _basePrice = basePrice,
-       _cartKey = cartKey;
+  }) : basePrice = basePrice ?? price;
 
   final int productId;
   final String productName;
@@ -42,7 +41,10 @@ class CartItemData {
   /// `basePrice + variantAdjustments + modifierAdjustments`.
   final double price;
 
-  final double? _basePrice;
+  /// The price before variant and modifier adjustments. Defaults to [price]
+  /// for a product with no options.
+  final double basePrice;
+
   final int quantity;
   final double taxAmountPerUnit;
   final bool isTaxable;
@@ -56,7 +58,12 @@ class CartItemData {
   /// Used to evaluate `scope: CATEGORY` discounts and promotions.
   final List<int> categoryIds;
 
-  final String? _cartKey;
+  /// Unique per line, and **required**: two lines of the same product with
+  /// different options must not collide, and per-line savings are keyed off
+  /// it. Kotlin defaults this to the product id, which Dart cannot express in
+  /// a const constructor — and making every call site state it is the safer
+  /// contract for a field this load-bearing.
+  final String cartKey;
 
   /// True when the product allows the cashier to change its price.
   final bool isPriceAdjustable;
@@ -64,20 +71,13 @@ class CartItemData {
   /// True when the cashier actually did change it on this line.
   final bool isPriceOverride;
 
-  /// The price before variant and modifier adjustments.
-  double get basePrice => _basePrice ?? price;
-
-  /// Unique per line. Two lines of the same product with different options
-  /// have different keys, and per-line savings are keyed off this.
-  String get cartKey => _cartKey ?? productId.toString();
-
   double get lineSubtotal => price * quantity;
 
   CartItemData copyWith({int? quantity}) => CartItemData(
     productId: productId,
     productName: productName,
     price: price,
-    basePrice: _basePrice,
+    basePrice: basePrice,
     quantity: quantity ?? this.quantity,
     taxAmountPerUnit: taxAmountPerUnit,
     isTaxable: isTaxable,
@@ -88,7 +88,7 @@ class CartItemData {
     selectedVariants: selectedVariants,
     selectedModifiers: selectedModifiers,
     categoryIds: categoryIds,
-    cartKey: _cartKey,
+    cartKey: cartKey,
     isPriceAdjustable: isPriceAdjustable,
     isPriceOverride: isPriceOverride,
   );
