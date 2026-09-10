@@ -1008,7 +1008,7 @@ git commit -m "feat(calc): promotion evaluation context and shared evaluator hel
 - Consumes: `PromotionEvaluator`, `EvaluationContext`, `filterItemsByScope`, `computeItemDiscountAmt` (Task 5).
 - Produces: `class DiscountByOrderEvaluator implements PromotionEvaluator`, `class DiscountByItemSubtotalEvaluator implements PromotionEvaluator`.
 
-- [ ] **Step 1: Port the two Kotlin test classes**
+- [x] **Step 1: Port the two Kotlin test classes**
 
 Read them first — they are the specification:
 
@@ -1020,22 +1020,22 @@ git show origin/feature/pos-asg-phase3:pos-core/src/test/java/com/cz/pos_core/ut
 
 Translate each `@Test` into a Dart `test(...)` with the same name and the same numbers. Do not "improve" the assertions — the numbers came from production mismatches.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `flutter test test/calc/promotion` — Expected: FAIL, evaluators missing.
 
-- [ ] **Step 3: Implement both evaluators**
+- [x] **Step 3: Implement both evaluators**
 
 Port verbatim. Two behaviours that are easy to lose and that the tests catch:
 
 - `DiscountByOrderEvaluator.computeEffectiveAmt` applies `jvmRound` to `min(evaluate(...), subTotal − totalDiscountAmt)`. The backend rounds this promo's contribution to whole rupiah before validating `netAmount`; no other promo type is rounded here.
 - `DiscountByItemSubtotalEvaluator.perItemDeduction` rounds each item's PERCENTAGE amount individually (`jvmRound`) and only then applies the cap proportionally. Summing first and rounding once diverges by a rupiah.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `flutter test test/calc/promotion` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/calc/promotion test/calc/promotion
