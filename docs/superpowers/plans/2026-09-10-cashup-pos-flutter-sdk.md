@@ -910,7 +910,7 @@ git commit -m "feat(calc): rounding utils and calculator value types"
   - `double netPricePerUnit(CartItemData item, EvaluationContext ctx, {Set<String>? freeItemCartKeys, bool roundAmountDiscount = false})`
   - `double computeItemDiscountAmt(CartItemData item, DiscountInput discountInput, double totalDiscountAmt, List<CartItemData> cartItems, {Set<String> freeItemCartKeys = const {}, bool roundAmountDiscount = true})`
 
-- [ ] **Step 1: Write the failing helper test**
+- [x] **Step 1: Write the failing helper test**
 
 ```dart
 // test/calc/promotion/promotion_evaluator_helpers_test.dart
@@ -973,19 +973,19 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `flutter test test/calc/promotion` — Expected: FAIL.
 
-- [ ] **Step 3: Implement `evaluation_context.dart` and `promotion_evaluator.dart`**
+- [x] **Step 3: Implement `evaluation_context.dart` and `promotion_evaluator.dart`**
 
 Port from the Kotlin verbatim. The two helper functions are the ones every evaluator shares; keep the doc comments explaining *why* `originalCartItems` is the denominator (claimed-unit reductions must not inflate other items' shares).
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `flutter test test/calc/promotion` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/calc/promotion test/calc/promotion
