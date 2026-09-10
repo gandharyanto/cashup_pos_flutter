@@ -1225,24 +1225,24 @@ Kotlin's `object TransactionCalculator` becomes a Dart class with a private cons
 12. Cash whole-rupiah rounding of serviceCharge, tax and total; `rounding` recomputed against the unrounded base
 13. Build `transactionItems`
 
-- [ ] **Step 1: Port `TransactionCalculatorTest.kt`**
+- [x] **Step 1: Port `TransactionCalculatorTest.kt`**
 
 ```bash
 cd /d/gandha_cashup/projects/mobile-apps-cashlez
 git show origin/feature/pos-asg-phase3:pos-core/src/test/java/com/cz/pos_core/util/TransactionCalculatorTest.kt
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `flutter test test/calc/transaction_calculator_test.dart` — Expected: FAIL.
 
-- [ ] **Step 3: Implement the totals path**
+- [x] **Step 3: Implement the totals path**
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `flutter test test/calc` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/calc test/calc
