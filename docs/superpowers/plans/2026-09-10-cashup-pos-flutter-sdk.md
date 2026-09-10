@@ -1067,7 +1067,7 @@ git commit -m "feat(calc): order and item-subtotal discount evaluators"
 
 **Why these are isolated:** in the Kotlin tree a fix to FREE repeatedly shifted PERCENTAGE and AMOUNT because they shared helpers. Keeping one file per reward type is the whole point; do not merge them.
 
-- [ ] **Step 1: Port the four Kotlin test classes**
+- [x] **Step 1: Port the four Kotlin test classes**
 
 ```bash
 cd /d/gandha_cashup/projects/mobile-apps-cashlez
@@ -1076,11 +1076,11 @@ for f in FreeRewardStrategyTest PercentageRewardStrategyTest AmountRewardStrateg
 done
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `flutter test test/calc/promotion/buyxgety` — Expected: FAIL.
 
-- [ ] **Step 3: Implement the four strategies**
+- [x] **Step 3: Implement the four strategies**
 
 The behaviour each test pins:
 
@@ -1089,11 +1089,11 @@ The behaviour each test pins:
 - **AMOUNT** — `min(rewardValue, netPricePerUnit(item))` per unit, cheapest first.
 - **FIXED_PRICE** — `max(0, netPricePerUnit(item) − fixedPrice)` per unit, cheapest first.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `flutter test test/calc/promotion/buyxgety` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/calc/promotion/buyxgety test/calc/promotion/buyxgety

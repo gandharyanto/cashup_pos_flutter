@@ -1,3 +1,5 @@
+import 'package:collection/collection.dart';
+
 import '../../util/num_utils.dart';
 import '../calculator_models.dart';
 import 'evaluation_context.dart';
@@ -173,4 +175,25 @@ double netPricePerUnit(
   );
   final netSubtotal = atLeastZero(item.lineSubtotal - share);
   return netSubtotal / item.quantity;
+}
+
+/// Sorts by [key] the way Kotlin's `sortedBy` does — **stably**.
+///
+/// Dart's [List.sort] is introsort and reorders equal elements. Kotlin's is
+/// stable, and the difference is observable here: when two reward candidates
+/// share a price, which one gets claimed decides the product id recorded in
+/// `claimedRewardUnits`, and therefore which line a later promotion can still
+/// reward. Cart order has to survive the sort.
+List<CartItemData> sortedByStable(
+  List<CartItemData> items,
+  double Function(CartItemData item) key, {
+  bool descending = false,
+}) {
+  final sorted = List<CartItemData>.of(items);
+  mergeSort<CartItemData>(
+    sorted,
+    compare: (a, b) =>
+        descending ? key(b).compareTo(key(a)) : key(a).compareTo(key(b)),
+  );
+  return sorted;
 }
