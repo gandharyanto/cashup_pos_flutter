@@ -1427,7 +1427,7 @@ git commit -m "feat(calc): per-item savings badges and discount/promotion eligib
 - A `DioException` is translated into a `PosException` at the client boundary. Nothing above `data/` ever sees a `DioException`.
 - A non-2xx response, or a body whose `status` field is not a success code, raises `PosException` carrying the backend `message` so the UI can show it verbatim.
 
-- [ ] **Step 1: Write the failing client test**
+- [x] **Step 1: Write the failing client test**
 
 ```dart
 // test/data/pos_api_client_test.dart
@@ -1500,11 +1500,11 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `flutter test test/data/pos_api_client_test.dart` — Expected: FAIL.
 
-- [ ] **Step 3: Implement `pos_exception.dart` then `pos_api_client.dart`**
+- [x] **Step 3: Implement `pos_exception.dart` then `pos_api_client.dart`**
 
 `PosException.friendlyMessage` returns Indonesian copy per `kind`, because every page shows it:
 
@@ -1529,11 +1529,11 @@ String get friendlyMessage {
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `flutter test test/data` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/data test/data
