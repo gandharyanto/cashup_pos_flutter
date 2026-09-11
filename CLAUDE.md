@@ -10,13 +10,14 @@ It is a port of an existing, shipping Kotlin implementation. That fact drives mo
 
 ## Status
 
-Pre-implementation. What exists today is the design and the roadmap:
+Implementation in progress. The plan's checkboxes are the progress record — a task whose steps are all `[x]` is done and committed; resume at the first unchecked task. `git log` confirms it (one `feat(...)` commit per task).
 
 - `docs/superpowers/specs/2026-09-10-cashup-pos-flutter-sdk-design.md` — the design spec
 - `docs/superpowers/plans/2026-09-10-cashup-pos-flutter-sdk.md` — 36-task implementation plan, TDD, checkbox steps
-- `lib/src/util/num_utils.dart` — the only implemented source file
 
-**Read the plan before writing code.** Execute it with `superpowers:subagent-driven-development` or `superpowers:executing-plans`.
+As of 2026-09-11, Tasks 1–10 are done: util helpers, all models, and the calculation engine up to transaction totals (`lib/src/calc/`). Nothing exists yet under `data/`, `payment/`, `config/`, `state/` or `ui/`.
+
+**Read the plan before writing code.** Execute it with `superpowers:subagent-driven-development` or `superpowers:executing-plans`. Task numbers in the plan's headings are authoritative; the `[T##]` tags in its File Structure block are off by one for `data/` and `payment/`.
 
 ## Commands
 
