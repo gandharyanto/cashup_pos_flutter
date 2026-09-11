@@ -704,6 +704,535 @@ class TransactionCalculator {
     );
   }
 
+  // ─── Cart badges ──────────────────────────────────────────────────────────
+
+  /// Per-line savings and badge labels for the cart, keyed by cart key.
+  ///
+  /// **Display only.** What the backend receives comes from
+  /// [calculateTransaction] and [buildTransactionPayload], which delegate
+  /// promotions entirely to [PromotionOrchestrator]. This keeps its own
+  /// attribution because it must credit FREE reward lines, and the
+  /// orchestrator's `computeAllPerItemDeductions` deliberately zeroes those.
+  /// Kotlin keeps the two apart for the same reason; do not unify them.
+  ///
+  /// A discount's saving follows its scope. A promotion's saving lands on the
+  /// lines that receive the benefit:
+  /// - `BUY_X_GET_Y` — reward lines only
+  /// - `DISCOUNT_BY_ITEM_SUBTOTAL` — buy-scope lines only
+  /// - `DISCOUNT_BY_ORDER` — every line, by its amount net of the discount
+  ///
+  /// A label joins the names of every source that touched the line with
+  /// `' + '`; blank names add to the saving but not to the label.
+  static PerItemSavingsResult computePerItemSavings(
+    List<CartItemData> cartItems,
+    DiscountInput? discountInput,
+    List<PromotionInput> promotions,
+  ) {
+    final subTotal = cartItems.fold<double>(
+      0,
+      (sum, i) => sum + i.lineSubtotal,
+    );
+    if (subTotal == 0) return const PerItemSavingsResult.empty();
+
+    // The same phases as calculateTransaction, up to the final discount.
+    final prelimDiscountAmt = discountInput == null
+        ? 0.0
+        : _calculateDiscountAmount(
+            discountInput,
+            cartItems,
+            subTotal,
+            const {},
+          );
+    final baseCtx = EvaluationContext(
+      cartItems: cartItems,
+      originalCartItems: cartItems,
+      discountInput: discountInput,
+      totalDiscountAmt: prelimDiscountAmt,
+      subTotal: subTotal,
+      freeItemCartKeys: const {},
+      freeQtyByCartKey: const {},
+      discountPerCartKey: _buildDiscountPerCartKey(
+        discountInput,
+        cartItems,
+        prelimDiscountAmt,
+      ),
+    );
+    final appliedPromoIds = _orchestrator
+        .evaluateAll(promotions, baseCtx)
+        .appliedIds;
+    final appliedFreePromos = promotions
+        .where(
+          (p) =>
+              appliedPromoIds.contains(p.promotionId) &&
+              p.isBuyXGetY &&
+              p.isFreeReward,
+        )
+        .toList(growable: false);
+    final freeQtyByCartKey = _computeFreeQtyByCartKey(
+      appliedFreePromos,
+      cartItems,
+      discountInput,
+      prelimDiscountAmt,
+    );
+    final freeItemCartKeys = _fullyFreeCartKeys(freeQtyByCartKey, cartItems);
+    final discountAmount = discountInput == null
+        ? 0.0
+        : _calculateDiscountAmount(
+            discountInput,
+            cartItems,
+            subTotal,
+            freeQtyByCartKey,
+          );
+
+    // Keyed by cart key, so two lines of one product stay apart.
+    final savings = <String, double>{};
+    final labelSources = <String, Set<String>>{};
+
+    void addSaving(String cartKey, double amount, String sourceName) {
+      savings[cartKey] = (savings[cartKey] ?? 0) + amount;
+      if (sourceName.trim().isNotEmpty) {
+        labelSources.putIfAbsent(cartKey, () => <String>{}).add(sourceName);
+      }
+    }
+
+    if (discountInput != null && discountAmount > 0) {
+      for (final item in cartItems) {
+        final amt = _computeItemDiscountAmt(
+          item,
+          discountInput,
+          discountAmount,
+          cartItems,
+          freeItemCartKeys: freeItemCartKeys,
+        );
+        if (amt > 0) addSaving(item.cartKey, amt, discountInput.name);
+      }
+    }
+
+    // Kotlin's sortedBy is stable; List.sort is not.
+    final appliedPromos = promotions
+        .where((p) => appliedPromoIds.contains(p.promotionId))
+        .toList();
+    mergeSort<PromotionInput>(
+      appliedPromos,
+      compare: (a, b) => a.priority.compareTo(b.priority),
+    );
+
+    var accSavingsPromoAmt = 0.0;
+    for (final promo in appliedPromos) {
+      // A FREE reward is re-valued the way the orchestrator first valued it:
+      // against the preliminary discount, with nothing free yet. The other
+      // reward types see the final discount and the free units.
+      final isFree = promo.isFreeReward;
+      final promoDiscountAmount = isFree ? prelimDiscountAmt : discountAmount;
+      final promoFreeItemCartKeys = isFree
+          ? const <String>{}
+          : freeItemCartKeys;
+      final promoFreeQtyByCartKey = isFree
+          ? const <String, int>{}
+          : freeQtyByCartKey;
+
+      final double promoAmount;
+      switch (promo.promoType) {
+        case PromotionInput.typeDiscountByOrder:
+          promoAmount = _calculatePromoByOrder(
+            promo,
+            atLeastZero(subTotal - discountAmount - accSavingsPromoAmt),
+          );
+        case PromotionInput.typeDiscountByItemSubtotal:
+          promoAmount = _calculatePromoByItemSubtotal(promo, cartItems);
+        case PromotionInput.typeBuyXGetY:
+          final promoCtx = EvaluationContext(
+            cartItems: cartItems,
+            originalCartItems: cartItems,
+            discountInput: discountInput,
+            totalDiscountAmt: promoDiscountAmount,
+            subTotal: subTotal,
+            freeItemCartKeys: promoFreeItemCartKeys,
+            freeQtyByCartKey: promoFreeQtyByCartKey,
+            discountPerCartKey: _buildDiscountPerCartKey(
+              discountInput,
+              cartItems,
+              promoDiscountAmount,
+            ),
+          );
+          promoAmount = _orchestrator.evaluateAll([
+            promo,
+          ], promoCtx).totalAmount;
+        default:
+          promoAmount = 0;
+      }
+      if (promoAmount <= 0) continue;
+
+      switch (promo.promoType) {
+        case PromotionInput.typeBuyXGetY:
+          if (promo.rewardType == PromotionInput.rewardAmount ||
+              promo.rewardType == PromotionInput.rewardFixedPrice) {
+            // Each reward line is capped by its own price, which only the
+            // evaluator's per-item split knows about.
+            final paidItems = cartItems
+                .where((i) => !freeItemCartKeys.contains(i.cartKey))
+                .toList(growable: false);
+            final promoCtx = EvaluationContext(
+              cartItems: paidItems,
+              originalCartItems: paidItems,
+              discountInput: discountInput,
+              totalDiscountAmt: promoDiscountAmount,
+              subTotal: subTotal,
+              freeItemCartKeys: promoFreeItemCartKeys,
+              freeQtyByCartKey: promoFreeQtyByCartKey,
+            );
+            _orchestrator
+                .computeAllPerItemDeductions(
+                  [promo],
+                  [promo.promotionId],
+                  promoCtx,
+                )
+                .forEach((cartKey, amount) {
+                  if (amount > 0) addSaving(cartKey, amount, promo.name);
+                });
+          } else {
+            final effectiveRewardItems = _effectiveRewardItems(
+              promo,
+              cartItems,
+              discountInput,
+              promoDiscountAmount,
+            );
+            final roundAmountDiscount =
+                promo.rewardType == PromotionInput.rewardPercentage;
+            double netPrice(CartItemData item) => _netPricePerUnit(
+              item,
+              discountInput,
+              promoDiscountAmount,
+              cartItems,
+              freeItemCartKeys: promoFreeItemCartKeys,
+              roundAmountDiscount: roundAmountDiscount,
+            );
+            final rewardSubtotal = effectiveRewardItems.fold<double>(
+              0,
+              (sum, i) => sum + netPrice(i) * i.quantity,
+            );
+            if (rewardSubtotal > 0) {
+              for (final item in effectiveRewardItems) {
+                final proportion =
+                    (netPrice(item) * item.quantity) / rewardSubtotal;
+                addSaving(item.cartKey, promoAmount * proportion, promo.name);
+              }
+            }
+          }
+
+        case PromotionInput.typeDiscountByItemSubtotal:
+          final eligibleItems = filterItemsByScope(
+            cartItems,
+            promo.buyScope,
+            promo.buyProductIds,
+            promo.buyCategoryIds,
+          );
+          double netItemSubtotal(CartItemData item) => atLeastZero(
+            item.lineSubtotal -
+                _computeItemDiscountAmt(
+                  item,
+                  discountInput,
+                  discountAmount,
+                  cartItems,
+                  freeItemCartKeys: freeItemCartKeys,
+                ),
+          );
+          final netEligibleSubtotal = eligibleItems.fold<double>(
+            0,
+            (sum, i) => sum + netItemSubtotal(i),
+          );
+          if (netEligibleSubtotal > 0) {
+            for (final item in eligibleItems) {
+              final proportion = netItemSubtotal(item) / netEligibleSubtotal;
+              addSaving(item.cartKey, promoAmount * proportion, promo.name);
+            }
+          }
+
+        default:
+          // DISCOUNT_BY_ORDER: spread by each line's amount net of its own
+          // discount share, so a line that already has a direct discount
+          // does not inflate the order-promo share of the others.
+          final effectiveOrderPromoAmt = math.min(
+            promoAmount,
+            atLeastZero(subTotal - discountAmount - accSavingsPromoAmt),
+          );
+          if (effectiveOrderPromoAmt <= 0) continue;
+          final itemNetAmounts = [
+            for (final item in cartItems)
+              atLeastZero(
+                item.lineSubtotal -
+                    _computeItemDiscountAmt(
+                      item,
+                      discountInput,
+                      discountAmount,
+                      cartItems,
+                      freeItemCartKeys: freeItemCartKeys,
+                    ),
+              ),
+          ];
+          final netTotal = itemNetAmounts.fold<double>(0, (sum, a) => sum + a);
+          if (netTotal <= 0) continue;
+          for (var i = 0; i < cartItems.length; i++) {
+            final itemShare =
+                effectiveOrderPromoAmt * itemNetAmounts[i] / netTotal;
+            if (itemShare > 0) {
+              addSaving(cartItems[i].cartKey, itemShare, promo.name);
+            }
+          }
+      }
+      accSavingsPromoAmt += promoAmount;
+    }
+
+    return PerItemSavingsResult(
+      savings: savings,
+      labels: labelSources.map(
+        (cartKey, names) => MapEntry(cartKey, names.join(' + ')),
+      ),
+    );
+  }
+
+  /// The reward lines a `BUY_X_GET_Y` saving is spread across.
+  ///
+  /// A cashier's selection is honoured outside `rewardScope: ALL` only while
+  /// enough buy-scope units remain to qualify once the selected units are
+  /// taken as rewards — "no reward without a qualifier". Validating that
+  /// directly, rather than filtering through the available pool, lets the
+  /// cashier pick a line that could also have qualified. Otherwise, and with
+  /// `ALL`, the available pool is used.
+  static List<CartItemData> _effectiveRewardItems(
+    PromotionInput promo,
+    List<CartItemData> cartItems,
+    DiscountInput? discountInput,
+    double totalDiscountAmt,
+  ) {
+    final buyItems = filterItemsByScope(
+      cartItems,
+      promo.buyScope,
+      promo.buyProductIds,
+      promo.buyCategoryIds,
+    );
+    final rewardItems = filterItemsByScope(
+      cartItems,
+      promo.rewardScope,
+      promo.rewardProductIds,
+      promo.rewardCategoryIds,
+    );
+
+    if (promo.selectedRewardQtyMap.isNotEmpty &&
+        promo.rewardScope != PromotionInput.scopeAll) {
+      final buyPids = buyItems.map((i) => i.productId).toSet();
+      final totalBuyQty = cartItems
+          .where((i) => buyPids.contains(i.productId))
+          .fold<int>(0, (sum, i) => sum + i.quantity);
+      final selectedConsumedFromBuy = cartItems
+          .where(
+            (i) =>
+                promo.selectedRewardQtyMap.containsKey(i.cartKey) &&
+                buyPids.contains(i.productId),
+          )
+          .fold<int>(
+            0,
+            (sum, i) =>
+                sum +
+                math.min(
+                  i.quantity,
+                  promo.selectedRewardQtyMap[i.cartKey] ?? 0,
+                ),
+          );
+      final selected = _selectedRewardItems(promo, rewardItems);
+      final selectionValid =
+          totalBuyQty - selectedConsumedFromBuy >= (promo.buyQty ?? 1);
+      if (selectionValid && selected.isNotEmpty) return selected;
+    }
+
+    return _buildAvailableRewardItems(
+      buyItems,
+      rewardItems,
+      promo.buyQty ?? 1,
+      discountInput,
+      totalDiscountAmt,
+      cartItems,
+    );
+  }
+
+  // ─── Eligibility ──────────────────────────────────────────────────────────
+
+  /// Whether [discount] can apply to the cart, so the picker can grey it out.
+  ///
+  /// A discount needs a positive value and a met minimum purchase. `ALL` then
+  /// always applies; `PRODUCT` and `CATEGORY` need at least one matching line.
+  static bool isDiscountEligible(
+    DiscountInput discount,
+    List<CartItemData> cartItems,
+    double subTotal,
+  ) {
+    if (discount.value <= 0) return false;
+    if (discount.minPurchase > 0 && subTotal < discount.minPurchase) {
+      return false;
+    }
+    switch (discount.scope) {
+      case DiscountInput.scopeAll:
+        return true;
+      case DiscountInput.scopeProduct:
+        return cartItems.any(
+          (i) => discount.eligibleProductIds.contains(i.productId),
+        );
+      case DiscountInput.scopeCategory:
+        return cartItems.any(
+          (i) => i.categoryIds.any(discount.eligibleCategoryIds.contains),
+        );
+      default:
+        return false;
+    }
+  }
+
+  /// Whether [promo] can apply to the cart, so the picker can grey it out.
+  ///
+  /// The promotion must be inside its schedule at [now] (default: the device
+  /// clock) and the minimum purchase met. Then:
+  /// - `DISCOUNT_BY_ORDER` — a positive value, and the cart's total quantity
+  ///   reaches `buyQty` when one is set
+  /// - `DISCOUNT_BY_ITEM_SUBTOTAL` — a positive value, and the buy-scope lines
+  ///   exist and reach `buyQty` when one is set
+  /// - `BUY_X_GET_Y` — at least one side scoped to specific items, the buy
+  ///   side reaching `buyQty`, and `getQty` reward units left once the buy
+  ///   condition has taken its units
+  ///
+  /// Kotlin reads the system clock here; [now] is injected so the schedule
+  /// branch can be tested.
+  static bool isPromotionEligible(
+    PromotionInput promo,
+    List<CartItemData> cartItems,
+    double subTotal, {
+    DateTime? now,
+  }) {
+    if (!_isScheduleActive(
+      promo.activeDays,
+      promo.activeStartTime,
+      promo.activeEndTime,
+      now ?? DateTime.now(),
+    )) {
+      return false;
+    }
+    if (subTotal < promo.minPurchase) return false;
+
+    switch (promo.promoType) {
+      case PromotionInput.typeDiscountByOrder:
+        if ((promo.value ?? 0) <= 0) return false;
+        // buyQty is the minimum total cart quantity.
+        final minQty = promo.buyQty ?? 0;
+        if (minQty > 0 &&
+            cartItems.fold<int>(0, (sum, i) => sum + i.quantity) < minQty) {
+          return false;
+        }
+        return true;
+
+      case PromotionInput.typeDiscountByItemSubtotal:
+        if ((promo.value ?? 0) <= 0) return false;
+        final eligible = filterItemsByScope(
+          cartItems,
+          promo.buyScope,
+          promo.buyProductIds,
+          promo.buyCategoryIds,
+        );
+        if (eligible.isEmpty) return false;
+        // buyQty is the minimum quantity of eligible lines.
+        final minQty = promo.buyQty ?? 0;
+        if (minQty > 0 &&
+            eligible.fold<int>(0, (sum, i) => sum + i.quantity) < minQty) {
+          return false;
+        }
+        return true;
+
+      case PromotionInput.typeBuyXGetY:
+        final buyQty = promo.buyQty;
+        final getQty = promo.getQty;
+        if (buyQty == null || getQty == null) return false;
+        // Both scopes ALL means the backend has no target items configured.
+        if (promo.buyScope == PromotionInput.scopeAll &&
+            promo.rewardScope == PromotionInput.scopeAll) {
+          return false;
+        }
+        final buyItems = filterItemsByScope(
+          cartItems,
+          promo.buyScope,
+          promo.buyProductIds,
+          promo.buyCategoryIds,
+        );
+        if (buyItems.fold<int>(0, (sum, i) => sum + i.quantity) < buyQty) {
+          return false;
+        }
+        // Reward units must survive the buy condition's reservation, which
+        // matters when buy and reward are the same product.
+        final rewardItems = _filterFixedPriceRewardCandidates(
+          filterItemsByScope(
+            cartItems,
+            promo.rewardScope,
+            promo.rewardProductIds,
+            promo.rewardCategoryIds,
+          ),
+          promo,
+        );
+        return _computeAvailableRewardQty(buyItems, rewardItems, buyQty) >=
+            getQty;
+
+      default:
+        return false;
+    }
+  }
+
+  static const _dayCodes = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+  /// Whether [now] falls inside a promotion's schedule.
+  ///
+  /// No days and no start time means always. Days are `MON`…`SUN`. The time
+  /// window applies only when both ends are set, and both ends are inclusive
+  /// to the minute.
+  static bool _isScheduleActive(
+    List<String> activeDays,
+    String? startTime,
+    String? endTime,
+    DateTime now,
+  ) {
+    if (activeDays.isEmpty && startTime == null) return true;
+    if (activeDays.isNotEmpty &&
+        !activeDays.contains(_dayCodes[now.weekday - 1])) {
+      return false;
+    }
+    if (startTime != null && endTime != null) {
+      final nowMinutes = now.hour * 60 + now.minute;
+      if (nowMinutes < _parseTimeToMinutes(startTime) ||
+          nowMinutes > _parseTimeToMinutes(endTime)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// `HH:mm` to minutes past midnight. A missing or unparseable part counts
+  /// as 0, as in Kotlin.
+  static int _parseTimeToMinutes(String time) {
+    final parts = time.split(':');
+    int part(int index) =>
+        index < parts.length ? (_kotlinToIntOrNull(parts[index]) ?? 0) : 0;
+    return part(0) * 60 + part(1);
+  }
+
+  static final _decimalInt = RegExp(r'^[+-]?[0-9]+$');
+
+  /// Kotlin's `String.toIntOrNull()` for ASCII input.
+  ///
+  /// Dart's `int.tryParse` is looser — it accepts surrounding whitespace and
+  /// `0x` hex — and would schedule `' 9:00'` where Kotlin does not.
+  static int? _kotlinToIntOrNull(String text) {
+    if (!_decimalInt.hasMatch(text)) return null;
+    final value = int.tryParse(text);
+    if (value == null || value < -0x80000000 || value > 0x7FFFFFFF) {
+      return null;
+    }
+    return value;
+  }
+
   // ─── Discount ─────────────────────────────────────────────────────────────
 
   /// The discount total, computed on effective prices with no tax involved.
@@ -928,6 +1457,67 @@ class TransactionCalculator {
     }
   }
 
+  // ─── Promotion amounts ────────────────────────────────────────────────────
+
+  /// A `DISCOUNT_BY_ORDER` amount on [subTotal], for the cart badges only.
+  ///
+  /// The calculator's own copy. Unlike the orchestrator's contribution it is
+  /// not rounded, and it takes the base it is given rather than deducting the
+  /// discount itself.
+  static double _calculatePromoByOrder(PromotionInput promo, double subTotal) {
+    final value = promo.value;
+    if (value == null) return 0;
+    final cap = promo.maxDiscountAmount;
+    switch (promo.valueType) {
+      case DiscountInput.typePercentage:
+        final raw = subTotal * value / 100.0;
+        return cap != null && cap > 0 ? math.min(raw, cap) : raw;
+      case DiscountInput.typeAmount:
+        return math.min(value, subTotal);
+      default:
+        return 0;
+    }
+  }
+
+  /// A `DISCOUNT_BY_ITEM_SUBTOTAL` amount on the buy-scope lines' gross
+  /// subtotals, for the cart badges only.
+  ///
+  /// `PERCENTAGE` rounds each line to whole rupiah before summing, as the
+  /// server does; the discount is a separate deduction and is not netted out.
+  static double _calculatePromoByItemSubtotal(
+    PromotionInput promo,
+    List<CartItemData> cartItems,
+  ) {
+    final value = promo.value;
+    if (value == null) return 0;
+    final eligible = filterItemsByScope(
+      cartItems,
+      promo.buyScope,
+      promo.buyProductIds,
+      promo.buyCategoryIds,
+    );
+    final cap = promo.maxDiscountAmount;
+    switch (promo.valueType) {
+      case DiscountInput.typePercentage:
+        final raw = eligible.fold<double>(
+          0,
+          (sum, i) => sum + jvmRound(i.lineSubtotal * value / 100.0),
+        );
+        return cap != null && cap > 0 ? math.min(raw, cap) : raw;
+      case DiscountInput.typeAmount:
+        final eligibleSubTotal = eligible.fold<double>(
+          0,
+          (sum, i) => sum + i.lineSubtotal,
+        );
+        final raw = promo.isMultiplied
+            ? eligible.fold<double>(0, (sum, i) => sum + value * i.quantity)
+            : value;
+        return math.min(raw, eligibleSubTotal);
+      default:
+        return 0;
+    }
+  }
+
   // ─── Free units ───────────────────────────────────────────────────────────
 
   /// Cart key to the number of units made free by applied FREE promotions.
@@ -957,18 +1547,7 @@ class TransactionCalculator {
         promo.buyCategoryIds,
       );
       final available = promo.selectedRewardQtyMap.isNotEmpty
-          ? rewardItems
-                .where((i) => promo.selectedRewardQtyMap.containsKey(i.cartKey))
-                .map(
-                  (i) => i.copyWith(
-                    quantity: math.min(
-                      i.quantity,
-                      promo.selectedRewardQtyMap[i.cartKey] ?? 0,
-                    ),
-                  ),
-                )
-                .where((i) => i.quantity > 0)
-                .toList(growable: false)
+          ? _selectedRewardItems(promo, rewardItems)
           : _buildAvailableRewardItems(
               buyItems,
               rewardItems,
@@ -988,6 +1567,68 @@ class TransactionCalculator {
       }
     }
     return freeQtys;
+  }
+
+  /// The reward lines the cashier selected, each capped at the quantity
+  /// selected for it. Lines selected at zero are dropped.
+  static List<CartItemData> _selectedRewardItems(
+    PromotionInput promo,
+    List<CartItemData> rewardItems,
+  ) => rewardItems
+      .where((i) => promo.selectedRewardQtyMap.containsKey(i.cartKey))
+      .map(
+        (i) => i.copyWith(
+          quantity: math.min(
+            i.quantity,
+            promo.selectedRewardQtyMap[i.cartKey] ?? 0,
+          ),
+        ),
+      )
+      .where((i) => i.quantity > 0)
+      .toList(growable: false);
+
+  /// How many reward units remain once the buy condition has reserved its
+  /// share — the calculator's own copy, for [isPromotionEligible].
+  ///
+  /// Buy-scope lines that are not reward candidates satisfy the condition
+  /// without consuming a reward unit, so only the shortfall is reserved.
+  /// BUY 2 GET 1 on one product: 2 in the cart leaves 0; 3 leaves 1.
+  static int _computeAvailableRewardQty(
+    List<CartItemData> buyItems,
+    List<CartItemData> rewardItems,
+    int buyQty,
+  ) {
+    final buyProductIds = buyItems.map((i) => i.productId).toSet();
+    final rewardProductIds = rewardItems.map((i) => i.productId).toSet();
+    final overlappingRewardQty = rewardItems
+        .where((i) => buyProductIds.contains(i.productId))
+        .fold<int>(0, (sum, i) => sum + i.quantity);
+    final nonOverlappingRewardQty = rewardItems
+        .where((i) => !buyProductIds.contains(i.productId))
+        .fold<int>(0, (sum, i) => sum + i.quantity);
+    final nonRewardBuyQty = buyItems
+        .where((i) => !rewardProductIds.contains(i.productId))
+        .fold<int>(0, (sum, i) => sum + i.quantity);
+    final unmetBuyQty = math.max(0, buyQty - nonRewardBuyQty);
+    final reservedForBuy = math.min(unmetBuyQty, overlappingRewardQty);
+    return overlappingRewardQty - reservedForBuy + nonOverlappingRewardQty;
+  }
+
+  /// For a `FIXED_PRICE` reward, only lines whose gross price exceeds the
+  /// fixed price — a cheaper line gains nothing. Other rewards pass through.
+  ///
+  /// The calculator's own copy, on gross price; the evaluator's compares a
+  /// net price.
+  static List<CartItemData> _filterFixedPriceRewardCandidates(
+    List<CartItemData> items,
+    PromotionInput promo,
+  ) {
+    final fixedPrice = promo.rewardValue;
+    if (promo.rewardType != PromotionInput.rewardFixedPrice ||
+        fixedPrice == null) {
+      return items;
+    }
+    return items.where((i) => i.price > fixedPrice).toList(growable: false);
   }
 
   /// Reward candidates with the units reserved for the buy condition removed.

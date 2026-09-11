@@ -1384,19 +1384,19 @@ git commit -m "feat(calc): transaction payload builder with per-item breakdown"
 
 **Note:** `computePerItemSavings` is **display-only** — it drives the per-line savings badge in the cart. It deliberately keeps its own FREE-reward attribution because the orchestrator's `computeAllPerItemDeductions` zeroes FREE items instead of attributing them. Do not "unify" the two; the Kotlin comment says the same.
 
-- [ ] **Step 1: Port both Kotlin test classes**
+- [x] **Step 1: Port both Kotlin test classes**
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `flutter test test/calc` — Expected: FAIL.
 
-- [ ] **Step 3: Implement savings and eligibility**
+- [x] **Step 3: Implement savings and eligibility**
 
-- [ ] **Step 4: Run to verify they pass**
+- [x] **Step 4: Run to verify they pass**
 
 Run: `flutter test test/calc` — Expected: PASS. This is the point where the whole engine is done; the suite should now mirror all 11 Kotlin test classes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/calc test/calc
