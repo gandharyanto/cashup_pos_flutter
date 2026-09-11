@@ -848,6 +848,87 @@ void main() {
     });
   });
 
+  group('payload free-line ranking', () {
+    test('the breakdown frees the line the calculator net price ranks, as Kotlin does', () {
+      // Same cart as the calculateTransaction ranking test. Values from the
+      // pinned Kotlin buildTransactionPayload run: A (cartKey 1) is the free
+      // line for tax, while the evaluator's roles reward B.
+      const b = CartItemData(
+        productId: 2,
+        productName: 'B',
+        price: 10004,
+        quantity: 1,
+        cartKey: '2',
+        isTaxable: true,
+        taxId: 1,
+        taxPercentage: 10,
+      );
+      const a = CartItemData(
+        productId: 1,
+        productName: 'A',
+        price: 10005,
+        quantity: 1,
+        cartKey: '1',
+        isTaxable: true,
+        taxId: 1,
+        taxPercentage: 10,
+      );
+      const discount = DiscountInput(
+        discountId: 3,
+        valueType: 'PERCENTAGE',
+        value: 10,
+      );
+      const promo = PromotionInput(
+        promotionId: 1,
+        promoType: 'BUY_X_GET_Y',
+        priority: 1,
+        canCombine: true,
+        buyQty: 1,
+        getQty: 1,
+        rewardType: 'FREE',
+        buyScope: 'PRODUCT',
+        buyProductIds: [1, 2],
+        rewardScope: 'PRODUCT',
+        rewardProductIds: [1, 2],
+      );
+
+      final result = calculate(
+        cartItems: const [b, a],
+        discountInput: discount,
+        promotions: const [promo],
+      );
+      final payload = TransactionCalculator.buildTransactionPayload(
+        result: result,
+        paymentMethod: 'QRIS',
+        discountId: 3,
+        discountInput: discount,
+        appliedPromotions: const [promo],
+        cartItemsForBreakdown: const [b, a],
+      );
+
+      expect(payload.totalTax, '900.40');
+      expect(payload.totalAmount, '9904.45');
+      expect(payload.discountAmount, '2001.00');
+      expect(payload.promotionAmount, '9003.55');
+
+      final itemB = payload.transactionItems.firstWhere(
+        (i) => i.productId == 2,
+      );
+      final itemA = payload.transactionItems.firstWhere(
+        (i) => i.productId == 1,
+      );
+      expect(payload.transactionItems.map((i) => i.productName), ['B', 'A']);
+      expect(itemB.discounts?.single.amt, '1000.00');
+      expect(itemB.promotions?.single.meta?.role, 'REWARD');
+      expect(itemB.promotions?.single.amt, '9003.55');
+      expect(itemB.taxes?.single.amt, '900.40');
+      expect(itemA.discounts?.single.amt, '1001.00');
+      expect(itemA.promotions?.single.meta?.role, 'QUALIFIER');
+      expect(itemA.promotions?.single.amt, '0.00');
+      expect(itemA.taxes, isNull);
+    });
+  });
+
   group('buildTransactionDetails', () {
     final dateShape = RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$');
 

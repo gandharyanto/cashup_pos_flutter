@@ -182,21 +182,6 @@ class BuyXGetYEvaluator extends PromotionEvaluator {
     ];
   }
 
-  /// The reward candidates left once qualifier-reserved units are removed.
-  ///
-  /// The calculator needs this to work out which cart lines a FREE reward
-  /// actually zeroes; exposing it here keeps that logic in one place rather
-  /// than duplicated, as the Kotlin original had it.
-  List<CartItemData> availableRewardPool(
-    PromotionInput promo,
-    EvaluationContext ctx,
-  ) => _buildAvailableRewardItems(
-    _buyItems(promo, ctx.cartItems),
-    _rewardItems(promo, ctx.cartItems, ctx),
-    promo.buyQty ?? 1,
-    ctx,
-  );
-
   /// Product id to the number of reward units this promotion consumes.
   ///
   /// The orchestrator tracks these across promotions so no physical unit is

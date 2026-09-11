@@ -9,7 +9,6 @@ import '../models/transaction_details.dart';
 import '../util/num_utils.dart';
 import '../util/pos_date_utils.dart';
 import 'calculator_models.dart';
-import 'promotion/buyxgety/buy_x_get_y_evaluator.dart';
 import 'promotion/evaluation_context.dart';
 import 'promotion/promotion_evaluator.dart';
 import 'promotion/promotion_orchestrator.dart';
@@ -37,7 +36,6 @@ class TransactionCalculator {
   TransactionCalculator._();
 
   static const _orchestrator = PromotionOrchestrator();
-  static const _buyXGetY = BuyXGetYEvaluator();
 
   /// How many times [calculateTransaction] has run.
   ///
@@ -98,8 +96,6 @@ class TransactionCalculator {
       cartItems,
       discount,
       prelimDiscountAmt,
-      subTotal,
-      discountPerCartKey,
     );
     final freeItemCartKeys = _fullyFreeCartKeys(freeQtyByCartKey, cartItems);
 
@@ -341,8 +337,6 @@ class TransactionCalculator {
         cartItemsForBreakdown,
         discountInput,
         result.discountAmount,
-        result.subTotal,
-        payloadDiscountPerCartKey,
       );
       final payloadFreeKeys = _fullyFreeCartKeys(
         payloadFreeQtyByCartKey,
@@ -945,31 +939,25 @@ class TransactionCalculator {
     List<CartItemData> cartItems,
     DiscountInput? discountInput,
     double totalDiscountAmt,
-    double subTotal,
-    Map<String, double> discountPerCartKey,
   ) {
     if (appliedFreePromos.isEmpty) return const {};
 
-    final ctx = EvaluationContext(
-      cartItems: cartItems,
-      originalCartItems: cartItems,
-      discountInput: discountInput,
-      totalDiscountAmt: totalDiscountAmt,
-      subTotal: subTotal,
-      freeItemCartKeys: const {},
-      freeQtyByCartKey: const {},
-      discountPerCartKey: discountPerCartKey,
-    );
-
     final freeQtys = <String, int>{};
     for (final promo in appliedFreePromos) {
+      final rewardItems = filterItemsByScope(
+        cartItems,
+        promo.rewardScope,
+        promo.rewardProductIds,
+        promo.rewardCategoryIds,
+      );
+      final buyItems = filterItemsByScope(
+        cartItems,
+        promo.buyScope,
+        promo.buyProductIds,
+        promo.buyCategoryIds,
+      );
       final available = promo.selectedRewardQtyMap.isNotEmpty
-          ? filterItemsByScope(
-                  cartItems,
-                  promo.rewardScope,
-                  promo.rewardProductIds,
-                  promo.rewardCategoryIds,
-                )
+          ? rewardItems
                 .where((i) => promo.selectedRewardQtyMap.containsKey(i.cartKey))
                 .map(
                   (i) => i.copyWith(
@@ -981,7 +969,14 @@ class TransactionCalculator {
                 )
                 .where((i) => i.quantity > 0)
                 .toList(growable: false)
-          : _buyXGetY.availableRewardPool(promo, ctx);
+          : _buildAvailableRewardItems(
+              buyItems,
+              rewardItems,
+              promo.buyQty ?? 1,
+              discountInput,
+              totalDiscountAmt,
+              cartItems,
+            );
 
       var unitsLeft = promo.getQty ?? 0;
       for (final candidate in sortedByStable(available, (i) => i.price)) {
@@ -993,6 +988,134 @@ class TransactionCalculator {
       }
     }
     return freeQtys;
+  }
+
+  /// Reward candidates with the units reserved for the buy condition removed.
+  ///
+  /// This is the calculator's own copy, **not** the promotion package's
+  /// `BuyXGetYEvaluator` pool, and the difference is observable. When several
+  /// overlapping lines compete to be the qualifier, the most expensive by
+  /// [_netPricePerUnit] is reserved first. That ranks on each line's own
+  /// rounded discount share, where the evaluator ranks on a proportional one.
+  /// With a 10% discount, lines at 10005 and 10004 both net 9004 here, so the
+  /// stable sort keeps cart order. Proportionally they net 9004.45 and 9003.55,
+  /// and a different line would go free.
+  ///
+  /// When one line overlaps, [buyQty] is reserved from it alone; when several
+  /// do, [buyQty] is reserved across them in total.
+  static List<CartItemData> _buildAvailableRewardItems(
+    List<CartItemData> buyItems,
+    List<CartItemData> rewardItems,
+    int buyQty,
+    DiscountInput? discountInput,
+    double totalDiscountAmt,
+    List<CartItemData> allCartItems, {
+    // Unmodified quantities, for the discount-share denominator.
+    List<CartItemData>? originalCartItems,
+  }) {
+    final original = originalCartItems ?? allCartItems;
+    final buyProductIds = buyItems.map((i) => i.productId).toSet();
+    final overlapping = rewardItems
+        .where((i) => buyProductIds.contains(i.productId))
+        .toList(growable: false);
+    final nonOverlapping = rewardItems
+        .where((i) => !buyProductIds.contains(i.productId))
+        .toList(growable: false);
+
+    if (overlapping.isEmpty) {
+      return nonOverlapping
+          .where((i) => i.quantity > 0)
+          .toList(growable: false);
+    }
+
+    // Non-reward buy lines can satisfy the buy condition without consuming
+    // reward units; only the shortfall is reserved from dual-role lines.
+    final rewardProductIds = rewardItems.map((i) => i.productId).toSet();
+    final nonRewardBuyQty = buyItems
+        .where((i) => !rewardProductIds.contains(i.productId))
+        .fold<int>(0, (sum, i) => sum + i.quantity);
+    final unmetBuyQty = math.max(0, buyQty - nonRewardBuyQty);
+
+    if (unmetBuyQty == 0) {
+      return [
+        ...overlapping,
+        ...nonOverlapping,
+      ].where((i) => i.quantity > 0).toList(growable: false);
+    }
+
+    // Line count, not distinct product ids: one product with different
+    // options occupies several lines and must be treated as multi-line.
+    final isMultiProductOverlap = overlapping.length > 1;
+    final List<CartItemData> adjustedOverlap;
+    if (isMultiProductOverlap) {
+      var reserveLeft = unmetBuyQty;
+      adjustedOverlap =
+          sortedByStable(
+                overlapping,
+                (i) => _netPricePerUnit(
+                  i,
+                  discountInput,
+                  totalDiscountAmt,
+                  allCartItems,
+                  originalCartItems: original,
+                ),
+                descending: true,
+              )
+              .map((item) {
+                final reserved = math.min(reserveLeft, item.quantity);
+                reserveLeft -= reserved;
+                return item.copyWith(quantity: item.quantity - reserved);
+              })
+              .toList(growable: false);
+    } else {
+      adjustedOverlap = overlapping
+          .map(
+            (item) => item.copyWith(
+              quantity: math.max(
+                0,
+                item.quantity - math.min(unmetBuyQty, item.quantity),
+              ),
+            ),
+          )
+          .toList(growable: false);
+    }
+
+    return [
+      ...adjustedOverlap,
+      ...nonOverlapping,
+    ].where((i) => i.quantity > 0).toList(growable: false);
+  }
+
+  /// What one unit of [item] costs after its discount share, by the
+  /// calculator's own [_computeItemDiscountAmt].
+  ///
+  /// The promotion package has a function of the same name that uses a
+  /// proportional share. The calculator must not call it — see
+  /// [_buildAvailableRewardItems].
+  static double _netPricePerUnit(
+    CartItemData item,
+    DiscountInput? discountInput,
+    double totalDiscountAmt,
+    List<CartItemData> cartItems, {
+    Set<String> freeItemCartKeys = const {},
+    // Unmodified quantities, so a claimed-unit reduction cannot inflate the
+    // share.
+    List<CartItemData>? originalCartItems,
+    bool roundAmountDiscount = false,
+  }) {
+    if (discountInput == null || totalDiscountAmt <= 0 || item.quantity <= 0) {
+      return item.price;
+    }
+    final share = _computeItemDiscountAmt(
+      item,
+      discountInput,
+      totalDiscountAmt,
+      originalCartItems ?? cartItems,
+      freeItemCartKeys: freeItemCartKeys,
+      roundAmountDiscount: roundAmountDiscount,
+    );
+    final netSubtotal = math.max(0.0, item.lineSubtotal - share);
+    return netSubtotal / item.quantity;
   }
 
   /// The lines where *every* unit is free.

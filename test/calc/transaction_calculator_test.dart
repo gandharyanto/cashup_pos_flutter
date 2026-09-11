@@ -788,6 +788,73 @@ void main() {
       expect(result.appliedPromotionIds, [1]);
     });
 
+    test('FREE qualifier ranking uses the calculator net price, so a tied line keeps cart order', () {
+      // Two overlapping lines, 10% uncapped PERCENTAGE discount, buy 1 get 1
+      // FREE across both. Expected values come from running the pinned Kotlin
+      // TransactionCalculator (kotlinc) on this exact cart.
+      //
+      // The calculator's own netPricePerUnit rounds each line's share:
+      //   B: 10004 - round(1000.4) = 9004    A: 10005 - round(1000.5) = 9004
+      // A tie, so the stable descending sort keeps cart order: B is reserved
+      // as the qualifier and A (cartKey 1) goes free — Kotlin reports
+      // freeQtyByCartKey = {1=1}. The promotion package's proportional share
+      // (9003.55 vs 9004.45) would reserve A and free B instead.
+      //
+      // Only B is taxed: (10004 - 1000) x 10% = 900.4. The promotion amount
+      // is the evaluator's own figure (B's proportional net), which Kotlin
+      // leaves as it is.
+      const b = CartItemData(
+        productId: 2,
+        productName: 'B',
+        price: 10004,
+        quantity: 1,
+        cartKey: '2',
+        isTaxable: true,
+        taxId: 1,
+        taxPercentage: 10,
+      );
+      const a = CartItemData(
+        productId: 1,
+        productName: 'A',
+        price: 10005,
+        quantity: 1,
+        cartKey: '1',
+        isTaxable: true,
+        taxId: 1,
+        taxPercentage: 10,
+      );
+
+      final result = calculate(
+        cartItems: const [b, a],
+        discountInput: const DiscountInput(
+          discountId: 3,
+          valueType: 'PERCENTAGE',
+          value: 10,
+        ),
+        promotions: [
+          bxgy(
+            id: 1,
+            rewardType: 'FREE',
+            buyProductIds: const [1, 2],
+            rewardProductIds: const [1, 2],
+          ),
+        ],
+      );
+
+      expect(result.subTotal, 20009.0);
+      expect(result.discountAmount, 2001.0);
+      expect(result.promotionAmount, closeTo(9003.550002498876, 1e-9));
+      expect(result.tax, 900.4);
+      expect(result.totalAmount, closeTo(9904.849997501124, 1e-9));
+
+      final lineB = result.transactionItems.firstWhere((i) => i.productId == 2);
+      final lineA = result.transactionItems.firstWhere((i) => i.productId == 1);
+      expect(lineB.taxAmount, '900.4');
+      expect(lineB.totalPrice, '10904.4');
+      expect(lineA.taxAmount, isNull, reason: 'A is the free line');
+      expect(lineA.totalPrice, '10005');
+    });
+
     test(
       'two BXGY FREE same qualifier same reward qty 1 only first applies',
       () {
