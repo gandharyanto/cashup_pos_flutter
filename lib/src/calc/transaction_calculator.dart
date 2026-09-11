@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
-import 'package:intl/intl.dart';
 
 import '../models/create_transaction_request.dart';
 import '../models/option_group.dart';
@@ -305,10 +304,10 @@ class TransactionCalculator {
 
     final promotionAmountForPayload = result.promotionAmount;
     final discountAmountStr = result.discountAmount > 0
-        ? money2(result.discountAmount)
+        ? jvmFormatFixed2(result.discountAmount)
         : null;
     final promotionAmountStr = promotionAmountForPayload > 0
-        ? money2(promotionAmountForPayload)
+        ? jvmFormatFixed2(promotionAmountForPayload)
         : null;
 
     // grossAmount − totalDiscount − totalPromotion. Tax is not deducted.
@@ -396,7 +395,7 @@ class TransactionCalculator {
 
     final String totalAmount;
     if (priceIncludeTax) {
-      totalAmount = money2(
+      totalAmount = jvmFormatFixed2(
         result.subTotal -
             result.discountAmount -
             promotionAmountForPayload +
@@ -404,12 +403,12 @@ class TransactionCalculator {
       );
     } else if (paymentMethod.toUpperCase() == 'CASH') {
       // Already settled to whole rupiah by calculateTransaction.
-      totalAmount = money2(result.totalAmount);
+      totalAmount = jvmFormatFixed2(result.totalAmount);
     } else {
       // Rebuilt from whole-rupiah components, so a fractional tax cannot
       // leave a non-cash total at .50.
       final totalDeduction = result.discountAmount + promotionAmountForPayload;
-      totalAmount = money2(
+      totalAmount = jvmFormatFixed2(
         jvmRound(result.subTotal) -
             totalDeduction +
             jvmRound(result.serviceCharge) +
@@ -420,13 +419,13 @@ class TransactionCalculator {
 
     return CreateTransactionRequest(
       paymentMethod: paymentMethod,
-      subTotal: money2(result.subTotal),
-      netAmount: money2(netAmount),
+      subTotal: jvmFormatFixed2(result.subTotal),
+      netAmount: jvmFormatFixed2(netAmount),
       discountAmount: discountAmountStr,
       promotionAmount: promotionAmountStr,
-      totalServiceCharge: money2(result.serviceCharge),
-      totalTax: money2(derivedTotalTax),
-      totalRounding: money2(result.rounding),
+      totalServiceCharge: jvmFormatFixed2(result.serviceCharge),
+      totalTax: jvmFormatFixed2(derivedTotalTax),
+      totalRounding: jvmFormatFixed2(result.rounding),
       totalAmount: totalAmount,
       paymentSetting: paymentSettingRequest,
       discountId: discountId,
@@ -531,7 +530,7 @@ class TransactionCalculator {
                     id: discountInput.discountId ?? 0,
                     type: discountInput.valueType,
                     value: discountInput.value,
-                    amt: money2(itemDiscountAmt),
+                    amt: jvmFormatFixed2(itemDiscountAmt),
                   ),
                 ]
               : null;
@@ -550,7 +549,7 @@ class TransactionCalculator {
                       (role) => ItemPromotionDetail(
                         id: role.promotionId,
                         type: role.promoType,
-                        amt: money2(role.amt),
+                        amt: jvmFormatFixed2(role.amt),
                         meta: ItemPromotionMeta(
                           role: role.role,
                           buyQty: role.buyQty,
@@ -586,7 +585,7 @@ class TransactionCalculator {
                     id: taxId,
                     type: 'PERCENTAGE',
                     value: item.taxPercentage ?? 0,
-                    amt: money2(itemTaxAmt),
+                    amt: jvmFormatFixed2(itemTaxAmt),
                   ),
                 ]
               : null;
@@ -594,9 +593,9 @@ class TransactionCalculator {
           return RequestTransactionItem(
             productId: item.productId,
             productName: item.productName,
-            price: money2(item.basePrice),
+            price: jvmFormatFixed2(item.basePrice),
             qty: item.quantity,
-            totalPrice: money2(item.lineSubtotal),
+            totalPrice: jvmFormatFixed2(item.lineSubtotal),
             variantId: item.variantId,
             variantOptionIds: buildVariantOptionIds(item.selectedVariants),
             details: buildItemDetails(
@@ -1177,11 +1176,11 @@ class TransactionCalculator {
       return RequestTransactionItem(
         productId: item.productId,
         productName: item.productName,
-        price: money2(item.price),
+        price: jvmFormatFixed2(item.price),
         qty: item.quantity,
-        totalPrice: money2(item.lineSubtotal),
+        totalPrice: jvmFormatFixed2(item.lineSubtotal),
         taxId: item.isTaxable ? item.taxId : null,
-        taxAmount: hasTax ? money2(itemTaxAmount) : null,
+        taxAmount: hasTax ? jvmFormatFixed2(itemTaxAmount) : null,
         variantId: item.variantId,
         variantOptionIds: buildVariantOptionIds(item.selectedVariants),
         details: buildItemDetails(
@@ -1196,32 +1195,14 @@ class TransactionCalculator {
       productName: item.productName,
       price: jvmRound(item.price).toInt().toString(),
       qty: item.quantity,
-      totalPrice: moneyUpTo2(item.lineSubtotal + itemTaxAmount),
+      totalPrice: jvmFormatUpTo2(item.lineSubtotal + itemTaxAmount),
       taxId: item.isTaxable ? item.taxId : null,
-      taxAmount: hasTax ? moneyUpTo2(itemTaxAmount) : null,
+      taxAmount: hasTax ? jvmFormatUpTo2(itemTaxAmount) : null,
       variantId: item.variantId,
       variantOptionIds: buildVariantOptionIds(item.selectedVariants),
       details: buildItemDetails(item.selectedVariants, item.selectedModifiers),
     );
   }
-}
-
-/// Kotlin's `DecimalFormat("0.00", DecimalFormatSymbols(Locale.US))`.
-///
-/// The locale is pinned so the separator can never follow the device's; an
-/// Indonesian locale would emit `1.234,56` and the backend would reject it.
-/// Constructed once — every money field of every payload line goes through it.
-final NumberFormat _money2Format = NumberFormat('0.00', 'en_US');
-
-/// `0.00` with a US decimal separator — the shape the backend parses.
-String money2(double value) => _money2Format.format(value);
-
-/// `0.##` — up to two decimals, trailing zeros dropped.
-String moneyUpTo2(double value) {
-  var text = value.toStringAsFixed(2);
-  if (!text.contains('.')) return text;
-  text = text.replaceFirst(RegExp(r'0+$'), '');
-  return text.endsWith('.') ? text.substring(0, text.length - 1) : text;
 }
 
 /// The chosen variant option ids, or null when the line has none.

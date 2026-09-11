@@ -65,6 +65,108 @@ void main() {
     });
   });
 
+  // Every expected string below was produced by a real JVM run of
+  // java.text.DecimalFormat("0.00" / "0.##", DecimalFormatSymbols(Locale.US))
+  // on OpenJDK 25 (the Android Studio JBR), not derived by hand.
+  group('jvmFormatFixed2', () {
+    test('rounds an exact binary tie to the even cent', () {
+      expect(jvmFormatFixed2(12000.125), '12000.12');
+      expect(jvmFormatFixed2(12000.375), '12000.38');
+      expect(jvmFormatFixed2(12000.625), '12000.62');
+      expect(jvmFormatFixed2(12000.875), '12000.88');
+      expect(jvmFormatFixed2(0.125), '0.12');
+      expect(jvmFormatFixed2(0.375), '0.38');
+      expect(jvmFormatFixed2(0.625), '0.62');
+      expect(jvmFormatFixed2(0.875), '0.88');
+      expect(jvmFormatFixed2(1.125), '1.12');
+      expect(jvmFormatFixed2(2.375), '2.38');
+    });
+
+    test('keeps the even-cent rounding at large rupiah magnitudes', () {
+      expect(jvmFormatFixed2(123456789.125), '123456789.12');
+      expect(jvmFormatFixed2(123456789.375), '123456789.38');
+      expect(jvmFormatFixed2(987654321.625), '987654321.62');
+    });
+
+    test(
+      'rounds a near-tie by the exact binary value, not its decimal look',
+      () {
+        // 1.115 is stored as 1.11499999…, 0.005 as 0.00500000000000000010….
+        // These are the values intl's NumberFormat got wrong.
+        expect(jvmFormatFixed2(0.745), '0.74');
+        expect(jvmFormatFixed2(1.115), '1.11');
+        expect(jvmFormatFixed2(1.855), '1.85');
+        expect(jvmFormatFixed2(1.005), '1.00');
+        expect(jvmFormatFixed2(2.675), '2.67');
+        expect(jvmFormatFixed2(0.005), '0.01');
+        expect(jvmFormatFixed2(0.015), '0.01');
+      },
+    );
+
+    test('rounds negative ties symmetrically', () {
+      expect(jvmFormatFixed2(-12000.125), '-12000.12');
+      expect(jvmFormatFixed2(-12000.375), '-12000.38');
+      expect(jvmFormatFixed2(-0.625), '-0.62');
+      expect(jvmFormatFixed2(-0.875), '-0.88');
+      expect(jvmFormatFixed2(-0.005), '-0.01');
+    });
+
+    test('keeps the minus sign on negative zero and on negatives that round to zero', () {
+      expect(jvmFormatFixed2(-0.0), '-0.00');
+      expect(jvmFormatFixed2(-0.001), '-0.00');
+      expect(jvmFormatFixed2(-0.004), '-0.00');
+      expect(jvmFormatFixed2(0.0), '0.00');
+      expect(jvmFormatFixed2(0.001), '0.00');
+    });
+
+    test('pads to two places and carries through nines', () {
+      expect(jvmFormatFixed2(1500.0), '1500.00');
+      expect(jvmFormatFixed2(1500.5), '1500.50');
+      expect(jvmFormatFixed2(-1500.5), '-1500.50');
+      expect(jvmFormatFixed2(0.1 + 0.2), '0.30');
+      expect(jvmFormatFixed2(9.999), '10.00');
+      expect(jvmFormatFixed2(19714.285714285714), '19714.29');
+      expect(jvmFormatFixed2(1971.4285714285713), '1971.43');
+    });
+
+    test('follows the shortest representation beyond cent precision', () {
+      // At 1e15 a double's step is 0.125; the JDK formats the shortest
+      // decimal "1000000000000000.1", not the exact tie.
+      expect(jvmFormatFixed2(1e15 + 0.125), '1000000000000000.10');
+    });
+
+    test('formats non-finite values with the US symbols', () {
+      expect(jvmFormatFixed2(double.nan), 'NaN');
+      expect(jvmFormatFixed2(double.infinity), '∞');
+      expect(jvmFormatFixed2(double.negativeInfinity), '-∞');
+    });
+  });
+
+  group('jvmFormatUpTo2', () {
+    test('drops trailing zeros and a bare point', () {
+      expect(jvmFormatUpTo2(1500.0), '1500');
+      expect(jvmFormatUpTo2(1500.5), '1500.5');
+      expect(jvmFormatUpTo2(1500.05), '1500.05');
+      expect(jvmFormatUpTo2(1500.10), '1500.1');
+      expect(jvmFormatUpTo2(-1500.5), '-1500.5');
+      expect(jvmFormatUpTo2(0.1 + 0.2), '0.3');
+    });
+
+    test('rounds with the same HALF_EVEN rule as 0.00', () {
+      expect(jvmFormatUpTo2(0.125), '0.12');
+      expect(jvmFormatUpTo2(12000.875), '12000.88');
+      expect(jvmFormatUpTo2(1.005), '1');
+      expect(jvmFormatUpTo2(1.115), '1.11');
+      expect(jvmFormatUpTo2(0.005), '0.01');
+    });
+
+    test('keeps the minus sign on negative zero', () {
+      expect(jvmFormatUpTo2(-0.0), '-0');
+      expect(jvmFormatUpTo2(-0.004), '-0');
+      expect(jvmFormatUpTo2(0.001), '0');
+    });
+  });
+
   group('atLeastZero', () {
     test('clamps negatives to zero and passes the rest through', () {
       expect(atLeastZero(-1), 0.0);

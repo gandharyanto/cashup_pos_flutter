@@ -10,6 +10,11 @@
 /// * `BigDecimal.setScale(n, HALF_UP)` — half-up on the decimal value.
 ///   See [setScale].
 /// * `floor` / `ceil` — identical in both languages.
+///
+/// Money strings follow the same rule: `DecimalFormat("0.00")` and
+/// `DecimalFormat("0.##")` round HALF_EVEN, which neither
+/// [double.toStringAsFixed] nor intl's `NumberFormat` does. See
+/// [jvmFormatFixed2] and [jvmFormatUpTo2].
 library;
 
 import 'dart:math' as math;
@@ -17,6 +22,7 @@ import 'dart:math' as math;
 const int _charZero = 0x30;
 const int _charFive = 0x35;
 const int _charNine = 0x39;
+const int _charDot = 0x2E;
 
 /// Half-up rounding with ties going toward positive infinity, matching
 /// `java.lang.Math.round` and Kotlin's `roundToInt()` / `roundToLong()`.
@@ -97,6 +103,98 @@ double _pointShiftedLeft(String digits, int scale) {
       : digits;
   final cut = padded.length - scale;
   return double.parse('${padded.substring(0, cut)}.${padded.substring(cut)}');
+}
+
+/// `java.text.DecimalFormat("0.00", DecimalFormatSymbols(Locale.US))` on the
+/// JDK: no grouping, `.` separator, exactly two decimals.
+///
+/// The Kotlin payload builds every money string this way, and the default
+/// rounding mode is HALF_EVEN — so an exact binary tie goes to the even cent
+/// (`12000.125` → `12000.12`), where `toStringAsFixed` and intl's
+/// `NumberFormat` both round it up to `12000.13`. See [_jvmRoundToCents] for
+/// how the JDK decides everything else.
+String jvmFormatFixed2(double value) =>
+    _jvmDecimalFormat(value, trimTrailingZeros: false);
+
+/// `java.text.DecimalFormat("0.##", DecimalFormatSymbols(Locale.US))` on the
+/// JDK: as [jvmFormatFixed2], then trailing zeros and a bare point dropped
+/// (`1500.0` → `1500`, `1500.5` → `1500.5`).
+String jvmFormatUpTo2(double value) =>
+    _jvmDecimalFormat(value, trimTrailingZeros: true);
+
+String _jvmDecimalFormat(double value, {required bool trimTrailingZeros}) {
+  if (value.isNaN) return 'NaN';
+  // isNegative is true for -0.0, and the JDK prints "-0.00" for it — and for
+  // any small negative that rounds to zero.
+  final sign = value.isNegative ? '-' : '';
+  if (value.isInfinite) return '$sign∞';
+
+  var text = _jvmRoundToCents(value.abs());
+  if (trimTrailingZeros) {
+    var end = text.length;
+    while (text.codeUnitAt(end - 1) == _charZero) {
+      end--;
+    }
+    if (text.codeUnitAt(end - 1) == _charDot) end--;
+    text = text.substring(0, end);
+  }
+  return '$sign$text';
+}
+
+/// [magnitude] (non-negative, finite) rounded HALF_EVEN to two decimals, as
+/// `I.FF`.
+///
+/// The JDK's `DigitList` rounds the *shortest* decimal representation — the
+/// digits of `Double.toString`, which Dart's [double.toString] reproduces —
+/// and consults the binary value only when the digit after the cut is a final
+/// `5`, i.e. when the shortest form is itself a cent midpoint:
+///
+/// * the double *is* that midpoint (`x × 8` is an integer, so the fraction is
+///   an odd multiple of 1/8) — a true tie, rounded to the even cent;
+/// * otherwise the double sits just to one side of it (`1.115` is stored as
+///   `1.11499999…`), and it rounds the way the exact value does — which is
+///   what [double.toStringAsFixed] computes.
+///
+/// Every other case is decided by the shortest digits alone. For money
+/// magnitudes that agrees with the exact value; it differs only where a
+/// double is coarser than a cent (`1e15 + 0.125` → `…0.10`), and the JDK
+/// behaviour is kept there too.
+String _jvmRoundToCents(double magnitude) {
+  final text = magnitude.toString();
+  if (text.contains('e')) {
+    // Exponential form: below 1e-6, which rounds to zero, or at 1e21 and
+    // above, where every double is already an integer.
+    return magnitude < 1 ? '0.00' : '${BigInt.from(magnitude)}.00';
+  }
+
+  final dot = text.indexOf('.');
+  if (dot < 0) return '$text.00';
+  final fractionLength = text.length - dot - 1;
+  if (fractionLength <= 2) {
+    return fractionLength == 2 ? text : '${text}0';
+  }
+
+  final kept = text.substring(0, dot + 3);
+  final roundingDigit = text.codeUnitAt(dot + 3);
+
+  if (roundingDigit == _charFive && fractionLength == 3) {
+    if ((magnitude * 8) % 1 != 0) return magnitude.toStringAsFixed(2);
+    final lastKeptIsOdd = text.codeUnitAt(dot + 2).isOdd;
+    return lastKeptIsOdd ? _incrementCents(kept, dot) : kept;
+  }
+
+  // Past a 5 the shortest form always has a non-zero digit, so >= 5 is above
+  // the midpoint.
+  return roundingDigit >= _charFive ? _incrementCents(kept, dot) : kept;
+}
+
+/// Adds one cent to `I.FF`, carrying into the integer part.
+String _incrementCents(String kept, int dot) {
+  final digits = _incrementDigits(
+    kept.substring(0, dot) + kept.substring(dot + 1),
+  );
+  final cut = digits.length - 2;
+  return '${digits.substring(0, cut)}.${digits.substring(cut)}';
 }
 
 /// Rounds to whole rupiah the way cash payments do: a fractional part of
