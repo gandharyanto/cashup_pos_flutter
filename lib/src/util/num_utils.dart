@@ -11,18 +11,22 @@
 ///   See [setScale].
 /// * `floor` / `ceil` — identical in both languages.
 ///
-/// Money strings follow the same rule: `DecimalFormat("0.00")` and
-/// `DecimalFormat("0.##")` round HALF_EVEN, which neither
-/// [double.toStringAsFixed] nor intl's `NumberFormat` does. See
-/// [jvmFormatFixed2] and [jvmFormatUpTo2].
+/// Money strings mirror Android rather than desktop JDK: its ICU-backed
+/// `DecimalFormat("0.00")` / `DecimalFormat("0.##")` round HALF_EVEN on the
+/// shortest decimal digits, which neither [double.toStringAsFixed] nor
+/// intl's `NumberFormat` does. See [formatDecimalFixed2] and
+/// [formatDecimalUpTo2].
 library;
 
 import 'dart:math' as math;
 
 const int _charZero = 0x30;
+const int _charOne = 0x31;
 const int _charFive = 0x35;
 const int _charNine = 0x39;
 const int _charDot = 0x2E;
+const int _charMinus = 0x2D;
+const int _charPlus = 0x2B;
 
 /// Half-up rounding with ties going toward positive infinity, matching
 /// `java.lang.Math.round` and Kotlin's `roundToInt()` / `roundToLong()`.
@@ -105,96 +109,156 @@ double _pointShiftedLeft(String digits, int scale) {
   return double.parse('${padded.substring(0, cut)}.${padded.substring(cut)}');
 }
 
-/// `java.text.DecimalFormat("0.00", DecimalFormatSymbols(Locale.US))` on the
-/// JDK: no grouping, `.` separator, exactly two decimals.
+/// Formats [value] the way Android's
+/// `java.text.DecimalFormat("0.00", DecimalFormatSymbols(Locale.US))` does:
+/// no grouping, `.` separator, exactly two decimals.
 ///
-/// The Kotlin payload builds every money string this way, and the default
-/// rounding mode is HALF_EVEN — so an exact binary tie goes to the even cent
-/// (`12000.125` → `12000.12`), where `toStringAsFixed` and intl's
-/// `NumberFormat` both round it up to `12000.13`. See [_jvmRoundToCents] for
-/// how the JDK decides everything else.
-String jvmFormatFixed2(double value) =>
-    _jvmDecimalFormat(value, trimTrailingZeros: false);
+/// On Android that class is backed by ICU, which rounds HALF_EVEN on the
+/// *shortest round-trip decimal* of the double — the digits of
+/// [double.toString] — and never looks at the binary value. Desktop JDK
+/// consults the binary value when those digits are a midpoint, so the two
+/// disagree on near-ties: `1.115` (stored as `1.11499999…`) is `"1.12"` here
+/// and on Android, `"1.11"` on JDK. Exact binary ties agree on both:
+/// `12000.125` → `"12000.12"`.
+///
+/// The payload targets Android because that is what the backend has been
+/// accepting from shipping clients. [double.toStringAsFixed] and intl's
+/// `NumberFormat` match neither: both round `12000.125` up to `"12000.13"`.
+String formatDecimalFixed2(double value) =>
+    _formatDecimal2(value, trimTrailingZeros: false);
 
-/// `java.text.DecimalFormat("0.##", DecimalFormatSymbols(Locale.US))` on the
-/// JDK: as [jvmFormatFixed2], then trailing zeros and a bare point dropped
-/// (`1500.0` → `1500`, `1500.5` → `1500.5`).
-String jvmFormatUpTo2(double value) =>
-    _jvmDecimalFormat(value, trimTrailingZeros: true);
+/// As [formatDecimalFixed2], for Android's
+/// `java.text.DecimalFormat("0.##", DecimalFormatSymbols(Locale.US))`:
+/// trailing zeros and a bare point are dropped (`1500.0` → `"1500"`,
+/// `1500.5` → `"1500.5"`).
+///
+/// It differs from desktop JDK the same way: `1.115` → `"1.12"` here,
+/// `"1.11"` on JDK.
+String formatDecimalUpTo2(double value) =>
+    _formatDecimal2(value, trimTrailingZeros: true);
 
-String _jvmDecimalFormat(double value, {required bool trimTrailingZeros}) {
+/// HALF_EVEN to two decimals, done on the decimal digits of the shortest
+/// representation rather than with binary arithmetic.
+String _formatDecimal2(double value, {required bool trimTrailingZeros}) {
   if (value.isNaN) return 'NaN';
-  // isNegative is true for -0.0, and the JDK prints "-0.00" for it — and for
-  // any small negative that rounds to zero.
-  final sign = value.isNegative ? '-' : '';
-  if (value.isInfinite) return '$sign∞';
+  // isNegative is true for -0.0. ICU prints "-0.00" for it, and for any
+  // small negative that rounds to zero.
+  final negative = value.isNegative;
+  if (value.isInfinite) return negative ? '-∞' : '∞';
 
-  var text = _jvmRoundToCents(value.abs());
-  if (trimTrailingZeros) {
-    var end = text.length;
-    while (text.codeUnitAt(end - 1) == _charZero) {
-      end--;
+  // "12000.125", "1500.0", "1e-7", "1.2345e+22".
+  final text = value.abs().toString();
+  final exponentAt = text.indexOf('e');
+  final mantissaEnd = exponentAt < 0 ? text.length : exponentAt;
+
+  // The mantissa's digits as code units, with a spare slot in front for a
+  // carry out of the leading digit. The value is 0.DIGITS × 10^decimalAt.
+  final digits = List<int>.filled(mantissaEnd + 1, _charZero);
+  var end = 1;
+  var decimalAt = -1;
+  for (var i = 0; i < mantissaEnd; i++) {
+    final unit = text.codeUnitAt(i);
+    if (unit == _charDot) {
+      decimalAt = end - 1;
+    } else {
+      digits[end++] = unit;
     }
-    if (text.codeUnitAt(end - 1) == _charDot) end--;
-    text = text.substring(0, end);
   }
-  return '$sign$text';
+  if (decimalAt < 0) decimalAt = end - 1;
+  if (exponentAt >= 0) decimalAt += _exponentOf(text, exponentAt + 1);
+
+  // Narrow to the significant digits, [start, end).
+  var start = 1;
+  while (start < end && digits[start] == _charZero) {
+    start++;
+    decimalAt--;
+  }
+  while (end > start && digits[end - 1] == _charZero) {
+    end--;
+  }
+
+  final keep = decimalAt + 2; // significant digits left of the cut
+  if (keep < 0) {
+    // Every digit sits past the third decimal, so the value is below 0.001.
+    end = start;
+  } else if (start + keep < end) {
+    final cut = start + keep;
+    final roundingDigit = digits[cut];
+    final bool roundUp;
+    if (roundingDigit != _charFive) {
+      roundUp = roundingDigit > _charFive;
+    } else if (cut + 1 < end) {
+      // Trailing zeros were trimmed, so a non-zero digit follows the 5.
+      roundUp = true;
+    } else {
+      // The digits are exactly a midpoint: round to the even cent.
+      roundUp = keep > 0 && digits[cut - 1].isOdd;
+    }
+    end = cut;
+    if (roundUp) {
+      var i = end - 1;
+      while (i >= start && digits[i] == _charNine) {
+        digits[i] = _charZero;
+        i--;
+      }
+      if (i >= start) {
+        digits[i]++;
+      } else {
+        start--;
+        digits[start] = _charOne;
+        decimalAt++;
+      }
+    }
+  }
+
+  final count = end - start;
+  final out = StringBuffer();
+  if (negative) out.writeCharCode(_charMinus);
+  if (decimalAt <= 0) {
+    out.writeCharCode(_charZero);
+  } else {
+    for (var i = 0; i < decimalAt; i++) {
+      out.writeCharCode(i < count ? digits[start + i] : _charZero);
+    }
+  }
+  final tenthsAt = decimalAt;
+  final tenths = tenthsAt >= 0 && tenthsAt < count
+      ? digits[start + tenthsAt]
+      : _charZero;
+  final hundredthsAt = decimalAt + 1;
+  final hundredths = hundredthsAt >= 0 && hundredthsAt < count
+      ? digits[start + hundredthsAt]
+      : _charZero;
+  if (!trimTrailingZeros || hundredths != _charZero) {
+    out
+      ..writeCharCode(_charDot)
+      ..writeCharCode(tenths)
+      ..writeCharCode(hundredths);
+  } else if (tenths != _charZero) {
+    out
+      ..writeCharCode(_charDot)
+      ..writeCharCode(tenths);
+  }
+  return out.toString();
 }
 
-/// [magnitude] (non-negative, finite) rounded HALF_EVEN to two decimals, as
-/// `I.FF`.
-///
-/// The JDK's `DigitList` rounds the *shortest* decimal representation — the
-/// digits of `Double.toString`, which Dart's [double.toString] reproduces —
-/// and consults the binary value only when the digit after the cut is a final
-/// `5`, i.e. when the shortest form is itself a cent midpoint:
-///
-/// * the double *is* that midpoint (`x × 8` is an integer, so the fraction is
-///   an odd multiple of 1/8) — a true tie, rounded to the even cent;
-/// * otherwise the double sits just to one side of it (`1.115` is stored as
-///   `1.11499999…`), and it rounds the way the exact value does — which is
-///   what [double.toStringAsFixed] computes.
-///
-/// Every other case is decided by the shortest digits alone. For money
-/// magnitudes that agrees with the exact value; it differs only where a
-/// double is coarser than a cent (`1e15 + 0.125` → `…0.10`), and the JDK
-/// behaviour is kept there too.
-String _jvmRoundToCents(double magnitude) {
-  final text = magnitude.toString();
-  if (text.contains('e')) {
-    // Exponential form: below 1e-6, which rounds to zero, or at 1e21 and
-    // above, where every double is already an integer.
-    return magnitude < 1 ? '0.00' : '${BigInt.from(magnitude)}.00';
+/// Reads the signed exponent that starts at [index] in [text] (`-7`, `+22`)
+/// without allocating a substring.
+int _exponentOf(String text, int index) {
+  var i = index;
+  var sign = 1;
+  final first = text.codeUnitAt(i);
+  if (first == _charMinus) {
+    sign = -1;
+    i++;
+  } else if (first == _charPlus) {
+    i++;
   }
-
-  final dot = text.indexOf('.');
-  if (dot < 0) return '$text.00';
-  final fractionLength = text.length - dot - 1;
-  if (fractionLength <= 2) {
-    return fractionLength == 2 ? text : '${text}0';
+  var exponent = 0;
+  for (; i < text.length; i++) {
+    exponent = exponent * 10 + (text.codeUnitAt(i) - _charZero);
   }
-
-  final kept = text.substring(0, dot + 3);
-  final roundingDigit = text.codeUnitAt(dot + 3);
-
-  if (roundingDigit == _charFive && fractionLength == 3) {
-    if ((magnitude * 8) % 1 != 0) return magnitude.toStringAsFixed(2);
-    final lastKeptIsOdd = text.codeUnitAt(dot + 2).isOdd;
-    return lastKeptIsOdd ? _incrementCents(kept, dot) : kept;
-  }
-
-  // Past a 5 the shortest form always has a non-zero digit, so >= 5 is above
-  // the midpoint.
-  return roundingDigit >= _charFive ? _incrementCents(kept, dot) : kept;
-}
-
-/// Adds one cent to `I.FF`, carrying into the integer part.
-String _incrementCents(String kept, int dot) {
-  final digits = _incrementDigits(
-    kept.substring(0, dot) + kept.substring(dot + 1),
-  );
-  final cut = digits.length - 2;
-  return '${digits.substring(0, cut)}.${digits.substring(cut)}';
+  return sign * exponent;
 }
 
 /// Rounds to whole rupiah the way cash payments do: a fractional part of

@@ -304,10 +304,10 @@ class TransactionCalculator {
 
     final promotionAmountForPayload = result.promotionAmount;
     final discountAmountStr = result.discountAmount > 0
-        ? jvmFormatFixed2(result.discountAmount)
+        ? formatDecimalFixed2(result.discountAmount)
         : null;
     final promotionAmountStr = promotionAmountForPayload > 0
-        ? jvmFormatFixed2(promotionAmountForPayload)
+        ? formatDecimalFixed2(promotionAmountForPayload)
         : null;
 
     // grossAmount − totalDiscount − totalPromotion. Tax is not deducted.
@@ -395,7 +395,7 @@ class TransactionCalculator {
 
     final String totalAmount;
     if (priceIncludeTax) {
-      totalAmount = jvmFormatFixed2(
+      totalAmount = formatDecimalFixed2(
         result.subTotal -
             result.discountAmount -
             promotionAmountForPayload +
@@ -403,12 +403,12 @@ class TransactionCalculator {
       );
     } else if (paymentMethod.toUpperCase() == 'CASH') {
       // Already settled to whole rupiah by calculateTransaction.
-      totalAmount = jvmFormatFixed2(result.totalAmount);
+      totalAmount = formatDecimalFixed2(result.totalAmount);
     } else {
       // Rebuilt from whole-rupiah components, so a fractional tax cannot
       // leave a non-cash total at .50.
       final totalDeduction = result.discountAmount + promotionAmountForPayload;
-      totalAmount = jvmFormatFixed2(
+      totalAmount = formatDecimalFixed2(
         jvmRound(result.subTotal) -
             totalDeduction +
             jvmRound(result.serviceCharge) +
@@ -419,13 +419,13 @@ class TransactionCalculator {
 
     return CreateTransactionRequest(
       paymentMethod: paymentMethod,
-      subTotal: jvmFormatFixed2(result.subTotal),
-      netAmount: jvmFormatFixed2(netAmount),
+      subTotal: formatDecimalFixed2(result.subTotal),
+      netAmount: formatDecimalFixed2(netAmount),
       discountAmount: discountAmountStr,
       promotionAmount: promotionAmountStr,
-      totalServiceCharge: jvmFormatFixed2(result.serviceCharge),
-      totalTax: jvmFormatFixed2(derivedTotalTax),
-      totalRounding: jvmFormatFixed2(result.rounding),
+      totalServiceCharge: formatDecimalFixed2(result.serviceCharge),
+      totalTax: formatDecimalFixed2(derivedTotalTax),
+      totalRounding: formatDecimalFixed2(result.rounding),
       totalAmount: totalAmount,
       paymentSetting: paymentSettingRequest,
       discountId: discountId,
@@ -530,7 +530,7 @@ class TransactionCalculator {
                     id: discountInput.discountId ?? 0,
                     type: discountInput.valueType,
                     value: discountInput.value,
-                    amt: jvmFormatFixed2(itemDiscountAmt),
+                    amt: formatDecimalFixed2(itemDiscountAmt),
                   ),
                 ]
               : null;
@@ -549,7 +549,7 @@ class TransactionCalculator {
                       (role) => ItemPromotionDetail(
                         id: role.promotionId,
                         type: role.promoType,
-                        amt: jvmFormatFixed2(role.amt),
+                        amt: formatDecimalFixed2(role.amt),
                         meta: ItemPromotionMeta(
                           role: role.role,
                           buyQty: role.buyQty,
@@ -585,7 +585,7 @@ class TransactionCalculator {
                     id: taxId,
                     type: 'PERCENTAGE',
                     value: item.taxPercentage ?? 0,
-                    amt: jvmFormatFixed2(itemTaxAmt),
+                    amt: formatDecimalFixed2(itemTaxAmt),
                   ),
                 ]
               : null;
@@ -593,9 +593,9 @@ class TransactionCalculator {
           return RequestTransactionItem(
             productId: item.productId,
             productName: item.productName,
-            price: jvmFormatFixed2(item.basePrice),
+            price: formatDecimalFixed2(item.basePrice),
             qty: item.quantity,
-            totalPrice: jvmFormatFixed2(item.lineSubtotal),
+            totalPrice: formatDecimalFixed2(item.lineSubtotal),
             variantId: item.variantId,
             variantOptionIds: buildVariantOptionIds(item.selectedVariants),
             details: buildItemDetails(
@@ -1176,11 +1176,11 @@ class TransactionCalculator {
       return RequestTransactionItem(
         productId: item.productId,
         productName: item.productName,
-        price: jvmFormatFixed2(item.price),
+        price: formatDecimalFixed2(item.price),
         qty: item.quantity,
-        totalPrice: jvmFormatFixed2(item.lineSubtotal),
+        totalPrice: formatDecimalFixed2(item.lineSubtotal),
         taxId: item.isTaxable ? item.taxId : null,
-        taxAmount: hasTax ? jvmFormatFixed2(itemTaxAmount) : null,
+        taxAmount: hasTax ? formatDecimalFixed2(itemTaxAmount) : null,
         variantId: item.variantId,
         variantOptionIds: buildVariantOptionIds(item.selectedVariants),
         details: buildItemDetails(
@@ -1195,9 +1195,9 @@ class TransactionCalculator {
       productName: item.productName,
       price: jvmRound(item.price).toInt().toString(),
       qty: item.quantity,
-      totalPrice: jvmFormatUpTo2(item.lineSubtotal + itemTaxAmount),
+      totalPrice: formatDecimalUpTo2(item.lineSubtotal + itemTaxAmount),
       taxId: item.isTaxable ? item.taxId : null,
-      taxAmount: hasTax ? jvmFormatUpTo2(itemTaxAmount) : null,
+      taxAmount: hasTax ? formatDecimalUpTo2(itemTaxAmount) : null,
       variantId: item.variantId,
       variantOptionIds: buildVariantOptionIds(item.selectedVariants),
       details: buildItemDetails(item.selectedVariants, item.selectedModifiers),

@@ -65,105 +65,134 @@ void main() {
     });
   });
 
-  // Every expected string below was produced by a real JVM run of
-  // java.text.DecimalFormat("0.00" / "0.##", DecimalFormatSymbols(Locale.US))
-  // on OpenJDK 25 (the Android Studio JBR), not derived by hand.
-  group('jvmFormatFixed2', () {
+  // Every expected string below was produced by ICU4J 75.1's DecimalFormat
+  // ("0.00" / "0.##", DecimalFormatSymbols(Locale.US), HALF_EVEN) — the
+  // implementation behind Android's java.text.DecimalFormat — not derived by
+  // hand. Where desktop JDK prints something else, the comment says so.
+  group('formatDecimalFixed2', () {
     test('rounds an exact binary tie to the even cent', () {
-      expect(jvmFormatFixed2(12000.125), '12000.12');
-      expect(jvmFormatFixed2(12000.375), '12000.38');
-      expect(jvmFormatFixed2(12000.625), '12000.62');
-      expect(jvmFormatFixed2(12000.875), '12000.88');
-      expect(jvmFormatFixed2(0.125), '0.12');
-      expect(jvmFormatFixed2(0.375), '0.38');
-      expect(jvmFormatFixed2(0.625), '0.62');
-      expect(jvmFormatFixed2(0.875), '0.88');
-      expect(jvmFormatFixed2(1.125), '1.12');
-      expect(jvmFormatFixed2(2.375), '2.38');
+      expect(formatDecimalFixed2(12000.125), '12000.12');
+      expect(formatDecimalFixed2(12000.375), '12000.38');
+      expect(formatDecimalFixed2(12000.625), '12000.62');
+      expect(formatDecimalFixed2(12000.875), '12000.88');
+      expect(formatDecimalFixed2(0.125), '0.12');
+      expect(formatDecimalFixed2(0.375), '0.38');
+      expect(formatDecimalFixed2(0.625), '0.62');
+      expect(formatDecimalFixed2(0.875), '0.88');
+      expect(formatDecimalFixed2(1.125), '1.12');
+      expect(formatDecimalFixed2(2.375), '2.38');
     });
 
     test('keeps the even-cent rounding at large rupiah magnitudes', () {
-      expect(jvmFormatFixed2(123456789.125), '123456789.12');
-      expect(jvmFormatFixed2(123456789.375), '123456789.38');
-      expect(jvmFormatFixed2(987654321.625), '987654321.62');
+      expect(formatDecimalFixed2(123456789.125), '123456789.12');
+      expect(formatDecimalFixed2(123456789.375), '123456789.38');
+      expect(formatDecimalFixed2(987654321.625), '987654321.62');
     });
 
     test(
-      'rounds a near-tie by the exact binary value, not its decimal look',
+      'rounds a near-tie on its shortest decimal digits, not its binary value',
       () {
-        // 1.115 is stored as 1.11499999…, 0.005 as 0.00500000000000000010….
-        // These are the values intl's NumberFormat got wrong.
-        expect(jvmFormatFixed2(0.745), '0.74');
-        expect(jvmFormatFixed2(1.115), '1.11');
-        expect(jvmFormatFixed2(1.855), '1.85');
-        expect(jvmFormatFixed2(1.005), '1.00');
-        expect(jvmFormatFixed2(2.675), '2.67');
-        expect(jvmFormatFixed2(0.005), '0.01');
-        expect(jvmFormatFixed2(0.015), '0.01');
+        // 1.115 is stored as 1.11499999…, but its shortest form "1.115" is a
+        // midpoint, so HALF_EVEN goes to the even cent. Desktop JDK follows the
+        // binary value instead: 1.11, 1.85, 2.67, 0.01, 0.01, 9.99.
+        expect(formatDecimalFixed2(1.115), '1.12');
+        expect(formatDecimalFixed2(1.855), '1.86');
+        expect(formatDecimalFixed2(2.675), '2.68');
+        expect(formatDecimalFixed2(0.015), '0.02');
+        expect(formatDecimalFixed2(0.005), '0.00');
+        expect(formatDecimalFixed2(9.995), '10.00');
+        // Near-ties where the even cent is below — same on both runtimes.
+        expect(formatDecimalFixed2(0.745), '0.74');
+        expect(formatDecimalFixed2(1.005), '1.00');
       },
     );
 
-    test('rounds negative ties symmetrically', () {
-      expect(jvmFormatFixed2(-12000.125), '-12000.12');
-      expect(jvmFormatFixed2(-12000.375), '-12000.38');
-      expect(jvmFormatFixed2(-0.625), '-0.62');
-      expect(jvmFormatFixed2(-0.875), '-0.88');
-      expect(jvmFormatFixed2(-0.005), '-0.01');
+    test(
+      'rounds percentage shares at rupiah magnitudes the way Android does',
+      () {
+        // Desktop JDK: 990.05, 450.07, 990.27, 1350.53, 1350.67.
+        expect(formatDecimalFixed2(18001 * 5.5 / 100), '990.06');
+        expect(formatDecimalFixed2(18003 * 2.5 / 100), '450.08');
+        expect(formatDecimalFixed2(18005 * 5.5 / 100), '990.28');
+        expect(formatDecimalFixed2(18007 * 7.5 / 100), '1350.52');
+        expect(formatDecimalFixed2(18009 * 7.5 / 100), '1350.68');
+        expect(formatDecimalFixed2(18055 * 5.5 / 100), '993.02');
+        expect(formatDecimalFixed2((10000 + 1100.5) * 5 / 100), '555.02');
+      },
+    );
+
+    test('rounds negative ties and near-ties symmetrically', () {
+      expect(formatDecimalFixed2(-12000.125), '-12000.12');
+      expect(formatDecimalFixed2(-12000.375), '-12000.38');
+      expect(formatDecimalFixed2(-0.625), '-0.62');
+      expect(formatDecimalFixed2(-0.875), '-0.88');
+      expect(formatDecimalFixed2(-1.115), '-1.12');
+      expect(formatDecimalFixed2(-0.015), '-0.02');
     });
 
     test('keeps the minus sign on negative zero and on negatives that round to zero', () {
-      expect(jvmFormatFixed2(-0.0), '-0.00');
-      expect(jvmFormatFixed2(-0.001), '-0.00');
-      expect(jvmFormatFixed2(-0.004), '-0.00');
-      expect(jvmFormatFixed2(0.0), '0.00');
-      expect(jvmFormatFixed2(0.001), '0.00');
+      expect(formatDecimalFixed2(-0.0), '-0.00');
+      expect(formatDecimalFixed2(-0.001), '-0.00');
+      expect(formatDecimalFixed2(-0.004), '-0.00');
+      expect(formatDecimalFixed2(-0.005), '-0.00');
+      expect(formatDecimalFixed2(0.0), '0.00');
+      expect(formatDecimalFixed2(0.001), '0.00');
     });
 
     test('pads to two places and carries through nines', () {
-      expect(jvmFormatFixed2(1500.0), '1500.00');
-      expect(jvmFormatFixed2(1500.5), '1500.50');
-      expect(jvmFormatFixed2(-1500.5), '-1500.50');
-      expect(jvmFormatFixed2(0.1 + 0.2), '0.30');
-      expect(jvmFormatFixed2(9.999), '10.00');
-      expect(jvmFormatFixed2(19714.285714285714), '19714.29');
-      expect(jvmFormatFixed2(1971.4285714285713), '1971.43');
+      expect(formatDecimalFixed2(1500.0), '1500.00');
+      expect(formatDecimalFixed2(1500.5), '1500.50');
+      expect(formatDecimalFixed2(-1500.5), '-1500.50');
+      expect(formatDecimalFixed2(0.1 + 0.2), '0.30');
+      expect(formatDecimalFixed2(9.999), '10.00');
+      expect(formatDecimalFixed2(0.995), '1.00');
+      expect(formatDecimalFixed2(999999.995), '1000000.00');
+      expect(formatDecimalFixed2(19714.285714285714), '19714.29');
+      expect(formatDecimalFixed2(1971.4285714285713), '1971.43');
     });
 
-    test('follows the shortest representation beyond cent precision', () {
-      // At 1e15 a double's step is 0.125; the JDK formats the shortest
-      // decimal "1000000000000000.1", not the exact tie.
-      expect(jvmFormatFixed2(1e15 + 0.125), '1000000000000000.10');
+    test('reads exponent forms of the shortest representation', () {
+      expect(formatDecimalFixed2(1e-7), '0.00');
+      expect(formatDecimalFixed2(5e-7), '0.00');
+      expect(formatDecimalFixed2(double.minPositive), '0.00');
+      expect(formatDecimalFixed2(1e21), '1000000000000000000000.00');
+      expect(formatDecimalFixed2(1.2345e22), '12345000000000000000000.00');
+      // A double this large is coarser than a cent; the shortest decimal is
+      // "1000000000000000.1".
+      expect(formatDecimalFixed2(1e15 + 0.125), '1000000000000000.10');
     });
 
     test('formats non-finite values with the US symbols', () {
-      expect(jvmFormatFixed2(double.nan), 'NaN');
-      expect(jvmFormatFixed2(double.infinity), '∞');
-      expect(jvmFormatFixed2(double.negativeInfinity), '-∞');
+      expect(formatDecimalFixed2(double.nan), 'NaN');
+      expect(formatDecimalFixed2(double.infinity), '∞');
+      expect(formatDecimalFixed2(double.negativeInfinity), '-∞');
     });
   });
 
-  group('jvmFormatUpTo2', () {
+  group('formatDecimalUpTo2', () {
     test('drops trailing zeros and a bare point', () {
-      expect(jvmFormatUpTo2(1500.0), '1500');
-      expect(jvmFormatUpTo2(1500.5), '1500.5');
-      expect(jvmFormatUpTo2(1500.05), '1500.05');
-      expect(jvmFormatUpTo2(1500.10), '1500.1');
-      expect(jvmFormatUpTo2(-1500.5), '-1500.5');
-      expect(jvmFormatUpTo2(0.1 + 0.2), '0.3');
+      expect(formatDecimalUpTo2(1500.0), '1500');
+      expect(formatDecimalUpTo2(1500.5), '1500.5');
+      expect(formatDecimalUpTo2(1500.05), '1500.05');
+      expect(formatDecimalUpTo2(1500.10), '1500.1');
+      expect(formatDecimalUpTo2(-1500.5), '-1500.5');
+      expect(formatDecimalUpTo2(0.1 + 0.2), '0.3');
+      expect(formatDecimalUpTo2(1e21), '1000000000000000000000');
     });
 
     test('rounds with the same HALF_EVEN rule as 0.00', () {
-      expect(jvmFormatUpTo2(0.125), '0.12');
-      expect(jvmFormatUpTo2(12000.875), '12000.88');
-      expect(jvmFormatUpTo2(1.005), '1');
-      expect(jvmFormatUpTo2(1.115), '1.11');
-      expect(jvmFormatUpTo2(0.005), '0.01');
+      expect(formatDecimalUpTo2(0.125), '0.12');
+      expect(formatDecimalUpTo2(12000.875), '12000.88');
+      expect(formatDecimalUpTo2(1.005), '1');
+      expect(formatDecimalUpTo2(1.115), '1.12');
+      expect(formatDecimalUpTo2(0.005), '0');
+      expect(formatDecimalUpTo2(9.995), '10');
     });
 
     test('keeps the minus sign on negative zero', () {
-      expect(jvmFormatUpTo2(-0.0), '-0');
-      expect(jvmFormatUpTo2(-0.004), '-0');
-      expect(jvmFormatUpTo2(0.001), '0');
+      expect(formatDecimalUpTo2(-0.0), '-0');
+      expect(formatDecimalUpTo2(-0.004), '-0');
+      expect(formatDecimalUpTo2(0.001), '0');
     });
   });
 
