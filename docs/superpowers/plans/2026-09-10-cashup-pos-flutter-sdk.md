@@ -1272,7 +1272,7 @@ git commit -m "feat(calc): transaction totals with tax, service charge and cash 
 - Items are emitted sorted by their first discount amount ascending.
 - `paymentSetting.taxAppliedAfterDiscount` is always `true`.
 
-- [ ] **Step 1: Write the failing payload test**
+- [x] **Step 1: Write the failing payload test**
 
 ```dart
 // test/calc/transaction_calculator_payload_test.dart
@@ -1346,17 +1346,17 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `flutter test test/calc/transaction_calculator_payload_test.dart` — Expected: FAIL.
 
-- [ ] **Step 3: Implement the payload builder**
+- [x] **Step 3: Implement the payload builder**
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `flutter test test/calc` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/calc test/calc

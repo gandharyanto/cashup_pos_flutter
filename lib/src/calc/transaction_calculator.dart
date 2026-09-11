@@ -1,9 +1,14 @@
 import 'dart:math' as math;
 
+import 'package:collection/collection.dart';
+import 'package:intl/intl.dart';
+
 import '../models/create_transaction_request.dart';
 import '../models/option_group.dart';
 import '../models/payment_setting.dart';
+import '../models/transaction_details.dart';
 import '../util/num_utils.dart';
+import '../util/pos_date_utils.dart';
 import 'calculator_models.dart';
 import 'promotion/buyxgety/buy_x_get_y_evaluator.dart';
 import 'promotion/evaluation_context.dart';
@@ -265,6 +270,446 @@ class TransactionCalculator {
   }) => paymentMethod.toUpperCase() == 'CASH'
       ? result.totalAmount
       : jvmRound(result.totalAmount);
+
+  // ─── Payload ──────────────────────────────────────────────────────────────
+
+  /// The `pos/transaction/create` payload for a priced [result].
+  ///
+  /// With [cartItemsForBreakdown] — the cart [result] was priced from — every
+  /// line carries its `discounts`, `promotions` and `taxes` arrays. Without it
+  /// the result's plain lines are sent as they are.
+  ///
+  /// [priceIncludeTax] selects the totals formula and is reported in
+  /// `paymentSetting` only when [paymentSettings] is null; the merchant's own
+  /// setting wins there.
+  static CreateTransactionRequest buildTransactionPayload({
+    required TransactionCalculationResult result,
+    required String paymentMethod,
+    String cashTendered = '0',
+    String cashChange = '0',
+    int? queueNumber,
+    bool priceIncludeTax = false,
+    String? notes,
+    int? discountId,
+    List<int>? promotionIds,
+    PaymentSetting? paymentSettings,
+    DiscountInput? discountInput,
+    List<PromotionInput> appliedPromotions = const [],
+    List<CartItemData> cartItemsForBreakdown = const [],
+  }) {
+    final promoIds = promotionIds != null && promotionIds.isNotEmpty
+        ? promotionIds
+        : (result.appliedPromotionIds.isNotEmpty
+              ? result.appliedPromotionIds
+              : null);
+
+    final promotionAmountForPayload = result.promotionAmount;
+    final discountAmountStr = result.discountAmount > 0
+        ? money2(result.discountAmount)
+        : null;
+    final promotionAmountStr = promotionAmountForPayload > 0
+        ? money2(promotionAmountForPayload)
+        : null;
+
+    // grossAmount − totalDiscount − totalPromotion. Tax is not deducted.
+    final netAmount =
+        result.subTotal - result.discountAmount - promotionAmountForPayload;
+
+    final paymentSettingRequest = _buildPaymentSettingRequest(
+      paymentSettings,
+      priceIncludeTax,
+    );
+
+    final List<RequestTransactionItem> items;
+    if (cartItemsForBreakdown.isNotEmpty) {
+      // Re-derived against the *final* discount, not the preliminary one
+      // calculateTransaction seeded promotions with — Kotlin does the same.
+      final payloadFreePromos = appliedPromotions
+          .where(
+            (p) =>
+                result.appliedPromotionIds.contains(p.promotionId) &&
+                p.isBuyXGetY &&
+                p.isFreeReward,
+          )
+          .toList(growable: false);
+      final payloadDiscountPerCartKey = _buildDiscountPerCartKey(
+        discountInput,
+        cartItemsForBreakdown,
+        result.discountAmount,
+      );
+      final payloadFreeQtyByCartKey = _computeFreeQtyByCartKey(
+        payloadFreePromos,
+        cartItemsForBreakdown,
+        discountInput,
+        result.discountAmount,
+        result.subTotal,
+        payloadDiscountPerCartKey,
+      );
+      final payloadFreeKeys = _fullyFreeCartKeys(
+        payloadFreeQtyByCartKey,
+        cartItemsForBreakdown,
+      );
+      final payloadPerItemPromoAmounts = _computePerItemTotalDeductionByCartKey(
+        promotions: appliedPromotions,
+        appliedPromoIds: result.appliedPromotionIds,
+        cartItems: cartItemsForBreakdown,
+        freeItemCartKeys: payloadFreeKeys,
+        freeQtyByCartKey: payloadFreeQtyByCartKey,
+        discountInput: discountInput,
+        totalDiscountAmt: result.discountAmount,
+        subTotal: result.subTotal,
+        discountPerCartKey: payloadDiscountPerCartKey,
+        perPromoAmounts: result.perPromoAmounts,
+      );
+      items = _buildItemsWithBreakdown(
+        cartItems: cartItemsForBreakdown,
+        discountInput: discountInput,
+        totalDiscountAmt: result.discountAmount,
+        appliedPromotions: appliedPromotions,
+        appliedPromoIds: result.appliedPromotionIds,
+        subTotal: result.subTotal,
+        priceIncludeTax: priceIncludeTax,
+        freeItemCartKeys: payloadFreeKeys,
+        freeQtyByCartKey: payloadFreeQtyByCartKey,
+        perItemPromoAmounts: payloadPerItemPromoAmounts,
+        discountPerCartKey: payloadDiscountPerCartKey,
+        perPromoAmounts: result.perPromoAmounts,
+      );
+    } else {
+      items = result.transactionItems;
+    }
+
+    // Ascending by first discount amount. Kotlin's sortedBy is stable, so lines
+    // with equal amounts keep cart order; List.sort would not.
+    final transactionItemsWithBreakdown = List<RequestTransactionItem>.of(
+      items,
+      growable: false,
+    );
+    mergeSort<RequestTransactionItem>(
+      transactionItemsWithBreakdown,
+      compare: (a, b) => a.firstDiscountAmount.compareTo(b.firstDiscountAmount),
+    );
+
+    // The aggregate tax, never the sum of the per-line rows: rounding each
+    // line to 2 dp diverges from the server's aggregate computation.
+    final derivedTotalTax = result.tax;
+
+    final String totalAmount;
+    if (priceIncludeTax) {
+      totalAmount = money2(
+        result.subTotal -
+            result.discountAmount -
+            promotionAmountForPayload +
+            result.serviceCharge,
+      );
+    } else if (paymentMethod.toUpperCase() == 'CASH') {
+      // Already settled to whole rupiah by calculateTransaction.
+      totalAmount = money2(result.totalAmount);
+    } else {
+      // Rebuilt from whole-rupiah components, so a fractional tax cannot
+      // leave a non-cash total at .50.
+      final totalDeduction = result.discountAmount + promotionAmountForPayload;
+      totalAmount = money2(
+        jvmRound(result.subTotal) -
+            totalDeduction +
+            jvmRound(result.serviceCharge) +
+            jvmRound(result.rounding) +
+            jvmRound(derivedTotalTax),
+      );
+    }
+
+    return CreateTransactionRequest(
+      paymentMethod: paymentMethod,
+      subTotal: money2(result.subTotal),
+      netAmount: money2(netAmount),
+      discountAmount: discountAmountStr,
+      promotionAmount: promotionAmountStr,
+      totalServiceCharge: money2(result.serviceCharge),
+      totalTax: money2(derivedTotalTax),
+      totalRounding: money2(result.rounding),
+      totalAmount: totalAmount,
+      paymentSetting: paymentSettingRequest,
+      discountId: discountId,
+      promotionIds: promoIds,
+      cashTendered: cashTendered,
+      cashChange: cashChange,
+      transactionItems: transactionItemsWithBreakdown,
+      queueNumber: queueNumber,
+      notes: notes != null && notes.trim().isNotEmpty ? notes : null,
+    );
+  }
+
+  /// The `paymentSetting` block. Always emitted, even with no settings, so the
+  /// backend is always told `taxAppliedAfterDiscount`.
+  static PaymentSettingRequest _buildPaymentSettingRequest(
+    PaymentSetting? settings,
+    bool priceIncludeTax,
+  ) {
+    ServiceChargeRequest? serviceChargeRequest;
+    if (settings != null && settings.isServiceCharge) {
+      final pct = settings.serviceChargePercentage;
+      final amt = settings.serviceChargeAmount;
+      if (pct > 0) {
+        serviceChargeRequest = ServiceChargeRequest(
+          type: 'PERCENTAGE',
+          value: pct,
+        );
+      } else if (amt > 0) {
+        serviceChargeRequest = ServiceChargeRequest(type: 'AMOUNT', value: amt);
+      }
+    }
+
+    return PaymentSettingRequest(
+      priceIncludeTax: settings?.isPriceIncludeTax ?? priceIncludeTax,
+      serviceCharge: serviceChargeRequest,
+    );
+  }
+
+  /// Payload lines with their per-item `discounts`, `promotions` and `taxes`.
+  ///
+  /// Kotlin also takes the result's existing lines here but never reads them,
+  /// so the parameter is not ported.
+  static List<RequestTransactionItem> _buildItemsWithBreakdown({
+    required List<CartItemData> cartItems,
+    required DiscountInput? discountInput,
+    required double totalDiscountAmt,
+    required List<PromotionInput> appliedPromotions,
+    required List<int> appliedPromoIds,
+    required double subTotal,
+    required bool priceIncludeTax,
+    required Set<String> freeItemCartKeys,
+    required Map<String, int> freeQtyByCartKey,
+    required Map<String, double> perItemPromoAmounts,
+    required Map<String, double> discountPerCartKey,
+    required Map<int, double> perPromoAmounts,
+  }) {
+    // Identical for every line; Kotlin rebuilds it per line.
+    final roleCtx = EvaluationContext(
+      cartItems: cartItems,
+      originalCartItems: cartItems,
+      discountInput: discountInput,
+      totalDiscountAmt: totalDiscountAmt,
+      subTotal: subTotal,
+      freeItemCartKeys: freeItemCartKeys,
+      freeQtyByCartKey: freeQtyByCartKey,
+      discountPerCartKey: discountPerCartKey,
+    );
+
+    return cartItems
+        .map((item) {
+          // A PERCENTAGE row is computed per line on the FULL quantity, so it
+          // matches the server's round(price × qty × pct / 100) exactly — the
+          // server validates it independently of free units. Kotlin applies
+          // no cap to this row either, and neither does the port.
+          final double itemDiscountAmt;
+          if (discountInput != null &&
+              discountInput.valueType == DiscountInput.typePercentage) {
+            final eligible = switch (discountInput.scope) {
+              DiscountInput.scopeAll => true,
+              DiscountInput.scopeProduct =>
+                discountInput.eligibleProductIds.contains(item.productId),
+              DiscountInput.scopeCategory => item.categoryIds.any(
+                discountInput.eligibleCategoryIds.contains,
+              ),
+              _ => false,
+            };
+            itemDiscountAmt = eligible
+                ? _itemDiscountRounded(item, discountInput.value)
+                : 0;
+          } else {
+            itemDiscountAmt = _computeItemDiscountAmt(
+              item,
+              discountInput,
+              totalDiscountAmt,
+              cartItems,
+              freeItemCartKeys: freeItemCartKeys,
+            );
+          }
+          final discountDetails = discountInput != null && itemDiscountAmt > 0
+              ? [
+                  ItemDiscountDetail(
+                    id: discountInput.discountId ?? 0,
+                    type: discountInput.valueType,
+                    value: discountInput.value,
+                    amt: money2(itemDiscountAmt),
+                  ),
+                ]
+              : null;
+
+          final promoRoles = _orchestrator.computeAllItemRoles(
+            item,
+            appliedPromotions,
+            appliedPromoIds,
+            roleCtx,
+            perPromoAmounts,
+          );
+          final promotionDetails = promoRoles.isEmpty
+              ? null
+              : promoRoles
+                    .map(
+                      (role) => ItemPromotionDetail(
+                        id: role.promotionId,
+                        type: role.promoType,
+                        amt: money2(role.amt),
+                        meta: ItemPromotionMeta(
+                          role: role.role,
+                          buyQty: role.buyQty,
+                          getQty: role.getQty,
+                        ),
+                      ),
+                    )
+                    .toList(growable: false);
+
+          // taxAppliedAfterDiscount is always true. The server validates
+          // Σ (totalPrice − deduction) × rate — or × rate/(1+rate) with
+          // priceIncludeTax — against the *raw* discount share, so the share
+          // is recomputed unrounded rather than reusing the row above.
+          final taxDiscountShare = _computeItemDiscountAmt(
+            item,
+            discountInput,
+            totalDiscountAmt,
+            cartItems,
+            freeItemCartKeys: freeItemCartKeys,
+            roundAmountDiscount: false,
+          );
+          final promoOnlyDeduction = atLeastZero(
+            (perItemPromoAmounts[item.cartKey] ?? 0) - taxDiscountShare,
+          );
+          final taxDeduction = taxDiscountShare + promoOnlyDeduction;
+          final itemTaxAmt = freeItemCartKeys.contains(item.cartKey)
+              ? 0.0
+              : _calculateItemTaxAmount(item, priceIncludeTax, taxDeduction);
+          final taxId = item.taxId;
+          final taxDetails = item.isTaxable && itemTaxAmt > 0 && taxId != null
+              ? [
+                  ItemTaxDetail(
+                    id: taxId,
+                    type: 'PERCENTAGE',
+                    value: item.taxPercentage ?? 0,
+                    amt: money2(itemTaxAmt),
+                  ),
+                ]
+              : null;
+
+          return RequestTransactionItem(
+            productId: item.productId,
+            productName: item.productName,
+            price: money2(item.basePrice),
+            qty: item.quantity,
+            totalPrice: money2(item.lineSubtotal),
+            variantId: item.variantId,
+            variantOptionIds: buildVariantOptionIds(item.selectedVariants),
+            details: buildItemDetails(
+              item.selectedVariants,
+              item.selectedModifiers,
+            ),
+            discounts: discountDetails,
+            promotions: promotionDetails,
+            taxes: taxDetails,
+            isPriceAdjustable: item.isPriceAdjustable ? true : null,
+            isPriceOverride: item.isPriceOverride ? true : null,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  // ─── Receipt ──────────────────────────────────────────────────────────────
+
+  /// A [TransactionDetails] for the receipt, built from [result] rather than
+  /// fetched, so the receipt shows exactly the figures that were sent.
+  ///
+  /// A settled payment row is recorded only for `QRIS` and `CDCP` with a
+  /// [qrisInvoice].
+  static TransactionDetails buildTransactionDetails({
+    required TransactionCalculationResult result,
+    required int transactionId,
+    required String transactionCode,
+    required String paymentMethod,
+    int cashTendered = 0,
+    int cashChange = 0,
+    String? qrisInvoice,
+    PaymentSetting? paymentSettings,
+    String? notes,
+  }) {
+    // Kotlin stamps both dates from separate Date() calls; one clock read
+    // keeps them from straddling a second.
+    final now = PosDates.apiDateTime(DateTime.now());
+
+    final payments =
+        (paymentMethod == 'QRIS' || paymentMethod == 'CDCP') &&
+            qrisInvoice != null
+        ? [
+            PaymentEntry(
+              transactionId: transactionId,
+              paymentMethod: paymentMethod,
+              amountPaid: result.totalAmount,
+              status: 'PAID',
+              paymentReference: qrisInvoice,
+              paymentDate: now,
+            ),
+          ]
+        : const <PaymentEntry>[];
+
+    final responseTransactionItems = result.transactionItems
+        .map((item) {
+          final itemTotalPrice = double.tryParse(item.totalPrice) ?? 0;
+          return TransactionLine(
+            productId: item.productId,
+            productName: item.productName ?? '',
+            price: double.tryParse(item.price) ?? 0,
+            qty: item.qty,
+            grossLineTotal: itemTotalPrice,
+            totalPrice: itemTotalPrice,
+            details:
+                item.details
+                    ?.map(
+                      (d) => TransactionLineDetail(
+                        detailType: d.detailType,
+                        name: d.name,
+                        groupName: d.groupName,
+                        referenceId: d.referenceId,
+                        groupReferenceId: d.groupReferenceId,
+                        priceAdjustment: d.priceAdjustment,
+                        qty: d.qty,
+                        sortOrder: d.sortOrder,
+                      ),
+                    )
+                    .toList(growable: false) ??
+                const [],
+          );
+        })
+        .toList(growable: false);
+
+    final pricing = TransactionPricing(
+      baseAmount: result.subTotal,
+      grossAmount: result.subTotal,
+      discountTotal: result.discountAmount,
+      promotionTotal: result.promotionAmount,
+      netAmount:
+          result.subTotal - result.discountAmount - result.promotionAmount,
+      serviceChargePercentage: paymentSettings?.serviceChargePercentage ?? 0,
+      serviceChargeTotal: result.serviceCharge,
+      taxTotal: result.tax,
+      roundingType: paymentSettings?.roundingType ?? 'NONE',
+      roundingTarget: paymentSettings?.roundingTarget.toString() ?? '0',
+      roundingTotal: result.rounding,
+      totalAmount: result.totalAmount,
+    );
+
+    return TransactionDetails(
+      transactionId: transactionId,
+      code: transactionCode,
+      status: 'COMPLETED',
+      paymentMethod: paymentMethod,
+      transactionDate: now,
+      notes: notes,
+      pricing: pricing,
+      cashTendered: cashTendered.toDouble(),
+      cashChange: cashChange.toDouble(),
+      transactionItems: responseTransactionItems,
+      payments: payments,
+    );
+  }
 
   // ─── Discount ─────────────────────────────────────────────────────────────
 
@@ -761,12 +1206,15 @@ class TransactionCalculator {
   }
 }
 
-/// `0.00` with a US decimal separator — the shape the backend parses.
+/// Kotlin's `DecimalFormat("0.00", DecimalFormatSymbols(Locale.US))`.
 ///
-/// Built by hand rather than through `NumberFormat` so the separator can never
-/// follow the device locale; an Indonesian locale would emit `1.234,56` and the
-/// backend would reject it.
-String money2(double value) => value.toStringAsFixed(2);
+/// The locale is pinned so the separator can never follow the device's; an
+/// Indonesian locale would emit `1.234,56` and the backend would reject it.
+/// Constructed once — every money field of every payload line goes through it.
+final NumberFormat _money2Format = NumberFormat('0.00', 'en_US');
+
+/// `0.00` with a US decimal separator — the shape the backend parses.
+String money2(double value) => _money2Format.format(value);
 
 /// `0.##` — up to two decimals, trailing zeros dropped.
 String moneyUpTo2(double value) {
