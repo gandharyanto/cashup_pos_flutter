@@ -1602,7 +1602,7 @@ Plus the small carriers: `class PosProductDraft`, `class PosCategoryDraft`, `cla
 
 **This interface is the seam that keeps the pure-online decision reversible.** A future caching or outbox implementation implements the same abstract class and nothing above `data/` changes. Do not let UI or state code reach past it to `PosApiClient`.
 
-- [ ] **Step 1: Write the failing repository test**
+- [x] **Step 1: Write the failing repository test**
 
 ```dart
 // test/data/pos_repository_impl_test.dart
@@ -1661,19 +1661,19 @@ void main() {
 
 Write `test/data/fake_api_client.dart` in the same step: it implements `PosApiClient`'s surface, records `lastPath` / `lastQuery` / `lastBody`, and returns the canned map for the requested path.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `flutter test test/data/pos_repository_impl_test.dart` — Expected: FAIL.
 
-- [ ] **Step 3: Implement the interface and the online implementation**
+- [x] **Step 3: Implement the interface and the online implementation**
 
 Map every endpoint from the table in the spec. Each method unwraps the `{status, message, data}` envelope and throws `PosException(kind: badResponse)` when `data` is missing where required.
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `flutter test test/data` — Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/data test/data
