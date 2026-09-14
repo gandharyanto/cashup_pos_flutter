@@ -9,7 +9,6 @@ library;
 
 import 'package:dio/dio.dart';
 
-import '../util/num_utils.dart';
 import 'pos_exception.dart';
 
 /// Connect/send/receive timeout, matching `PosService.TIMEOUT_SECONDS`.
@@ -20,8 +19,10 @@ const _timeout = Duration(seconds: 10);
 ///    every call (the host owns refresh; nothing here caches the token),
 ///  * merges in [extraHeaders] (the Dart counterpart of the device-id /
 ///    version-id / user-agent headers `PosAuthInterceptor` adds),
-///  * decodes the backend's `{"status": "200", "message": ..., "data": ...}`
-///    envelope, and
+///  * decodes the backend's `{"response_code"/"code": ..., "message": ...,
+///    "data": ...}` envelope by the same success predicate the pinned
+///    Kotlin's `ResponseManager.responseImpl` applies (see [_decodeSuccess]),
+///    and
 ///  * translates every `DioException` into a [PosException] so nothing
 ///    above `data/` ever sees Dio.
 class PosApiClient {
@@ -93,8 +94,22 @@ class PosApiClient {
   }
 
   /// A 2xx HTTP response reached here; still validates the backend's own
-  /// `status` field, since the backend reports business-level failures
-  /// (insufficient stock, duplicate SKU, ...) with HTTP 200.
+  /// business-level success code. The body's `status` field is **not** the
+  /// success signal — `GeneralResponse.java` declares it as a separate,
+  /// unrelated field. The real predicate, ported from
+  /// `ResponseManager.responseImpl` (pinned Kotlin,
+  /// `common-general/.../network/ResponseManager.kt:277-300`):
+  ///  * the code comes from `response_code`, then `code`, then
+  ///    `responseCode` (`GeneralResponse`'s `@SerializedName` alternates);
+  ///    when none of those keys is present at all, it defaults to the HTTP
+  ///    status code (`dataResponse.code = dataResponse.code ?: response.code()`).
+  ///  * success iff the code's first two characters are a prefix of `"00"`,
+  ///    or the full code is (case-insensitively) `"0P00"`, `"0P01"`,
+  ///    `"200"`, or merely *contains* `"200"` — the last of those is
+  ///    `PosRepositoryImpl.kt`'s `isSuccess = { code -> code.contains("200") }`,
+  ///    passed for every `/pos/` call and folded in here.
+  /// The failure message comes from `message`, then `msg`, then
+  /// `responseMessage`.
   Map<String, dynamic> _decodeSuccess(Response<dynamic> response) {
     final data = response.data;
     if (data is! Map<String, dynamic>) {
@@ -105,20 +120,41 @@ class PosApiClient {
       );
     }
 
-    // Backend success code is "200"; see PosRepositoryImpl.kt's
-    // `isSuccess = { code -> code.contains("200") }` (e.g. line 102) and
-    // ResponseManager.responseImpl's `"200".equals(responseCodeFull, ...)`.
-    // The field arrives as either a string or a number depending on
-    // endpoint, hence the loose coercion.
-    if (asInt(data['status']) != 200) {
-      throw PosException(
-        kind: PosErrorKind.unknown,
-        message: data['message']?.toString() ?? 'Request failed',
-        code: data['status']?.toString(),
-        statusCode: response.statusCode,
-      );
-    }
-    return data;
+    final code =
+        data['response_code']?.toString() ??
+        data['code']?.toString() ??
+        data['responseCode']?.toString() ??
+        response.statusCode?.toString() ??
+        '';
+
+    if (_isSuccessCode(code)) return data;
+
+    final message =
+        data['message']?.toString() ??
+        data['msg']?.toString() ??
+        data['responseMessage']?.toString() ??
+        'Request failed';
+    throw PosException(
+      kind: PosErrorKind.unknown,
+      message: message,
+      code: code.isEmpty ? null : code,
+      statusCode: response.statusCode,
+    );
+  }
+
+  /// The `ResponseManager.responseImpl` / `PosRepositoryImpl.isSuccess`
+  /// predicate described above [_decodeSuccess], applied case-insensitively.
+  /// Kotlin's `responseCodeFull.substring(0, 2)` throws for a code shorter
+  /// than two characters; here that case simply fails the `"00"`-prefix leg
+  /// rather than throwing, then falls through to the other legs.
+  bool _isSuccessCode(String code) {
+    final full = code.toUpperCase();
+    final prefix = full.length >= 2 ? full.substring(0, 2) : null;
+    return (prefix != null && '00'.startsWith(prefix)) ||
+        full == '0P00' ||
+        full == '0P01' ||
+        full == '200' ||
+        full.contains('200');
   }
 
   PosException _translate(DioException error) {
