@@ -15,7 +15,7 @@ Implementation in progress. The plan's checkboxes are the progress record — a 
 - `docs/superpowers/specs/2026-09-10-cashup-pos-flutter-sdk-design.md` — the design spec
 - `docs/superpowers/plans/2026-09-10-cashup-pos-flutter-sdk.md` — 36-task implementation plan, TDD, checkbox steps
 
-As of 2026-09-11, Tasks 1–10 are done: util helpers, all models, and the calculation engine up to transaction totals (`lib/src/calc/`). Nothing exists yet under `data/`, `payment/`, `config/`, `state/` or `ui/`.
+As of 2026-09-14, Tasks 1–13 are done: util helpers, all models, the complete calculation engine (`lib/src/calc/` — totals, payload builder, per-item savings and eligibility), and the dio-backed `PosApiClient` with its typed error model (`lib/src/data/`). Task 14 (`PosRepository`) is next. Nothing exists yet under `payment/`, `config/`, `state/` or `ui/`.
 
 **Read the plan before writing code.** Execute it with `superpowers:subagent-driven-development` or `superpowers:executing-plans`. Task numbers in the plan's headings are authoritative; the `[T##]` tags in its File Structure block are off by one for `data/` and `payment/`.
 
