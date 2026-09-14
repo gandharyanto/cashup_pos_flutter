@@ -120,12 +120,7 @@ class PosApiClient {
       );
     }
 
-    final code =
-        data['response_code']?.toString() ??
-        data['code']?.toString() ??
-        data['responseCode']?.toString() ??
-        response.statusCode?.toString() ??
-        '';
+    final code = _readCode(data) ?? response.statusCode?.toString() ?? '';
 
     if (_isSuccessCode(code)) return data;
 
@@ -141,6 +136,19 @@ class PosApiClient {
       statusCode: response.statusCode,
     );
   }
+
+  /// Reads the backend's own business code from a decoded JSON body via the
+  /// `GeneralResponse` `@SerializedName` alternates, in Kotlin's declared
+  /// order: `response_code`, then `code`, then `responseCode`. `status` is
+  /// never part of this — see the class and [_decodeSuccess] docs. Returns
+  /// `null` when the body carries none of those keys, so callers can decide
+  /// their own fallback (the HTTP status for the 2xx path in
+  /// [_decodeSuccess]; nothing further for the error path in
+  /// [_translateBadResponse]).
+  String? _readCode(Map<String, dynamic> body) =>
+      body['response_code']?.toString() ??
+      body['code']?.toString() ??
+      body['responseCode']?.toString();
 
   /// The `ResponseManager.responseImpl` / `PosRepositoryImpl.isSuccess`
   /// predicate described above [_decodeSuccess], applied case-insensitively.
@@ -208,9 +216,7 @@ class PosApiClient {
     final statusCode = error.response?.statusCode;
     final body = error.response?.data;
     final backendMessage = body is Map ? body['message']?.toString() : null;
-    final backendCode = body is Map
-        ? (body['status']?.toString() ?? body['code']?.toString())
-        : null;
+    final backendCode = body is Map<String, dynamic> ? _readCode(body) : null;
     final message = backendMessage ?? error.message ?? 'Request failed';
 
     if (statusCode == 401) {
