@@ -9,7 +9,6 @@ library;
 
 import 'package:dio/dio.dart';
 
-import '../util/num_utils.dart';
 import 'pos_exception.dart';
 
 /// Connect/send/receive timeout, matching `PosService.TIMEOUT_SECONDS`.
@@ -93,8 +92,17 @@ class PosApiClient {
   }
 
   /// A 2xx HTTP response reached here; still validates the backend's own
-  /// `status` field, since the backend reports business-level failures
+  /// business-level code, since the backend reports business-level failures
   /// (insufficient stock, duplicate SKU, ...) with HTTP 200.
+  ///
+  /// Ported from `GeneralResponse.java` (`common-general/.../network/response/`)
+  /// + `ResponseManager.responseImpl` (`common-general/.../network/ResponseManager.kt:277-303`).
+  /// The success code lives under `response_code` (aliases `code`,
+  /// `responseCode`) — `status` is a distinct field GeneralResponse never
+  /// consults. Every `PosRepositoryImpl.kt` call additionally passes
+  /// `isSuccess = { code -> code.contains("200") }`; since this client
+  /// stands in for all of those call sites, that predicate is folded into
+  /// [_isSuccessCode] rather than threaded through as a parameter.
   Map<String, dynamic> _decodeSuccess(Response<dynamic> response) {
     final data = response.data;
     if (data is! Map<String, dynamic>) {
@@ -105,20 +113,38 @@ class PosApiClient {
       );
     }
 
-    // Backend success code is "200"; see PosRepositoryImpl.kt's
-    // `isSuccess = { code -> code.contains("200") }` (e.g. line 102) and
-    // ResponseManager.responseImpl's `"200".equals(responseCodeFull, ...)`.
-    // The field arrives as either a string or a number depending on
-    // endpoint, hence the loose coercion.
-    if (asInt(data['status']) != 200) {
+    final codeValue =
+        data['response_code'] ?? data['code'] ?? data['responseCode'];
+    final responseCodeFull = (codeValue ?? response.statusCode ?? 200)
+        .toString();
+    if (!_isSuccessCode(responseCodeFull)) {
+      final message = data['message'] ?? data['msg'] ?? data['responseMessage'];
       throw PosException(
         kind: PosErrorKind.unknown,
-        message: data['message']?.toString() ?? 'Request failed',
-        code: data['status']?.toString(),
+        message: message?.toString() ?? 'Request failed',
+        code: responseCodeFull,
         statusCode: response.statusCode,
       );
     }
     return data;
+  }
+
+  /// Mirrors `"00".startsWith(responseCode, ignoreCase = true) ||
+  /// "0P00".equals(responseCodeFull, ignoreCase = true) ||
+  /// "0P01".equals(responseCodeFull, ignoreCase = true) ||
+  /// isSuccess?.invoke(responseCodeFull) == true` from `ResponseManager.kt`,
+  /// with `isSuccess` fixed to `code.contains("200")` (see above). Kotlin's
+  /// `responseCodeFull.substring(0, 2)` throws on a code shorter than 2
+  /// characters; this guards instead, since a short code should simply fail
+  /// the prefix check rather than crash the client.
+  static bool _isSuccessCode(String responseCodeFull) {
+    final prefix = responseCodeFull.length >= 2
+        ? responseCodeFull.substring(0, 2)
+        : responseCodeFull;
+    return '00'.startsWith(prefix) ||
+        responseCodeFull.toUpperCase() == '0P00' ||
+        responseCodeFull.toUpperCase() == '0P01' ||
+        responseCodeFull.contains('200');
   }
 
   PosException _translate(DioException error) {
