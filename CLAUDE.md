@@ -15,7 +15,7 @@ Implementation in progress. The plan's checkboxes are the progress record — a 
 - `docs/superpowers/specs/2026-09-10-cashup-pos-flutter-sdk-design.md` — the design spec
 - `docs/superpowers/plans/2026-09-10-cashup-pos-flutter-sdk.md` — 36-task implementation plan, TDD, checkbox steps
 
-As of 2026-09-11, Tasks 1–10 are done: util helpers, all models, and the calculation engine up to transaction totals (`lib/src/calc/`). Nothing exists yet under `data/`, `payment/`, `config/`, `state/` or `ui/`.
+As of 2026-09-23, Tasks 1–13 are done: util helpers, all models, the complete calculation engine (`lib/src/calc/`, including per-item savings badges and discount/promotion eligibility), and the API client + typed error model (`lib/src/data/pos_api_client.dart`, `pos_exception.dart`). Task 14 (`PosRepository` interface and online implementation) is next — its checkbox steps are unstarted. Nothing exists yet under `payment/`, `config/`, `state/` or `ui/`.
 
 **Read the plan before writing code.** Execute it with `superpowers:subagent-driven-development` or `superpowers:executing-plans`. Task numbers in the plan's headings are authoritative; the `[T##]` tags in its File Structure block are off by one for `data/` and `payment/`.
 
@@ -39,17 +39,23 @@ Android builds of the example app need `JAVA_HOME` on **JDK 17**. The JBR bundle
 
 The calculation engine and every screen are ported from:
 
-- Repo: `D:\gandha_cashup\projects\mobile-apps-cashlez`
-- Branch: `origin/feature/pos-asg-phase3`
-- Pinned commit: `33ddffdcc50aa8f9c6c53344bb4b269de5733064`
+- Repo: `C:\Users\ACER\Documents\projects\cash-pay-tech-mobile-function` (live checkout, same repo formerly referenced at `D:\gandha_cashup\projects\mobile-apps-cashlez`)
+- Branch: `feature/pos-asg-phase3` (checked out locally, tracks `origin/feature/pos-asg-phase3`)
+- Pinned commit: `6990fbbb5` — bumped from `33ddffdcc50aa8f9c6c53344bb4b269de5733064` on 2026-09-23; the only `pos-core`/`feature/pos*` changes in between touch `ReceiptTemplate.kt`, `ReceiptComponents.kt` (Task 29) and `PosSummaryReportActivity.kt` (Task 34) — nothing in `calc/` or the data layer, so Tasks 1-13 are unaffected.
 - Modules: `pos-core` (engine + data), `feature/pos` (phone UI), `feature/pos-tablet` (tablet UI), `feature/pos-shared`
 
-Read the original without checking the branch out:
+It's a working checkout, not a bare clone — read files directly instead of `git show`:
 
 ```bash
-cd /d/gandha_cashup/projects/mobile-apps-cashlez
-git show origin/feature/pos-asg-phase3:pos-core/src/main/java/com/cz/pos_core/util/TransactionCalculator.kt
-git ls-tree -r --name-only origin/feature/pos-asg-phase3 -- pos-core/src/test
+cat "C:\Users\ACER\Documents\projects\cash-pay-tech-mobile-function\pos-core\src\main\java\com\cz\pos_core\util\TransactionCalculator.kt"
+cd "C:\Users\ACER\Documents\projects\cash-pay-tech-mobile-function" && git ls-tree -r --name-only HEAD -- pos-core/src/test
+```
+
+The working tree may carry local, uncommitted edits (e.g. `config.properties`) — irrelevant to the port, ignore them. Before trusting the pin, confirm it's still an ancestor of `HEAD` and re-diff for new `pos-core`/`feature/pos*` changes:
+
+```bash
+cd "C:\Users\ACER\Documents\projects\cash-pay-tech-mobile-function" && git merge-base --is-ancestor 6990fbbb5 HEAD && echo ok
+git diff --stat 6990fbbb5..HEAD -- pos-core feature/pos feature/pos-tablet feature/pos-shared
 ```
 
 Dart file names deliberately mirror the Kotlin ones so the two trees can be diffed by eye when the backend changes. Do not restructure for elegance.
