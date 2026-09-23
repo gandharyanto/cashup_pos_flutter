@@ -4,6 +4,14 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 16 complete
+
+- **Task 16 (config/theme/SDK entry point) done**, reviewed clean, approved. Commit `e4d06ed` — `feat(sdk): public entry point, configuration and theme tokens`. 417/417 tests passing, analyze clean.
+- `lib/cashup_pos.dart` is now non-empty for the first time — public surface includes `CashupPos`/`CashupPosLauncher`, `PosConfig`/`PosMerchant`/`PosFeatureFlags`, `PosTheme`, payment contracts, `PosException`/`PosErrorKind`, `PosRepository`, `TransactionDetails`.
+- `PosTheme` colors ported from `feature/pos-tablet/.../pos_design_tokens.xml` (verified against the live Kotlin checkout — tablet and phone variants genuinely differ on 3 colors; tablet file used correctly per the brief). Spacing/corner-radius tokens are original additions (not in the XML), clearly documented as such.
+- `CashupPosLauncher`'s 4 methods (`open`/`openTransactions`/`openProductManagement`/`openSettings`) navigate to an honest inert placeholder page for now — real pages arrive in Tasks 23+ which will replace only `open`'s body.
+- 3 Minor findings deferred to the ledger (no `copyWith` on `PosConfig`; `initialize`/`dispose` declared `async` with no `await`; missing tests for re-initialize-disposes-prior-container and `PosTheme.toThemeData`) — none blocking.
+
 ## 2026-09-24 (continued) — Task 14 complete
 
 - **Task 14 (`PosRepository` interface + online implementation) done**, reviewed, one fix round, re-verified clean. Final commits `652f498` → `3a534b9` (`feat(data): PosRepository interface and online implementation` + `fix(data): narrow payment-setting request bodies to match backend DTOs`). 414/414 tests passing, analyze clean.

@@ -1855,7 +1855,7 @@ class CashupPosLauncher {
 
 Each launcher wraps its route in `UncontrolledProviderScope(container: CashupPos.container, child: ...)` so SDK state never touches the host's Riverpod graph.
 
-- [ ] **Step 1: Write the failing config test**
+- [x] **Step 1: Write the failing config test**
 
 ```dart
 // test/config/pos_config_test.dart
@@ -1892,11 +1892,11 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `flutter test test/config`
+- [x] **Step 2: Run to verify it fails** — `flutter test test/config`
 
-- [ ] **Step 3: Implement config, theme and the SDK entry point**
+- [x] **Step 3: Implement config, theme and the SDK entry point**
 
-- [ ] **Step 4: Export the public surface from `lib/cashup_pos.dart`**
+- [x] **Step 4: Export the public surface from `lib/cashup_pos.dart`**
 
 ```dart
 library cashup_pos;
@@ -1912,9 +1912,9 @@ export 'src/data/pos_repository.dart' show PosRepository;
 export 'src/models/transaction_details.dart' show TransactionDetails;
 ```
 
-- [ ] **Step 5: Run to verify it passes** — `flutter test` (whole suite)
+- [x] **Step 5: Run to verify it passes** — `flutter test` (whole suite)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib test
