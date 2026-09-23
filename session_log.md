@@ -1,5 +1,10 @@
 # Session Log
 
+## 2026-09-24 (continued) — Task 32 complete — category management
+
+- **Task 32 done.** Added category list/detail/create/update/delete flows, required-name validation, destructive confirmation, and direct backend error display for categories still in use. Product management links to the category screen.
+- 503/503 tests passing; analyzer clean. Next: Task 33 payment and receipt settings.
+
 ## 2026-09-24 (continued) — Task 31 complete — product and stock management
 
 - **Task 31 done.** Added product list/detail/create/update flows with validation and category multi-select, plus dated stock movement history and IN/OUT stock updates. The product-management launcher now opens the real page.

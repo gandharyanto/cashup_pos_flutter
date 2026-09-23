@@ -8,6 +8,7 @@ import '../../state/pos_providers.dart';
 import '../../util/currency.dart';
 import '../widgets/async_view.dart';
 import '../widgets/pos_scaffold.dart';
+import 'manage_category_page.dart';
 import 'stock_movement_page.dart';
 
 final managedProductsProvider = FutureProvider((ref) async {
@@ -34,6 +35,14 @@ class ManageProductPage extends ConsumerWidget {
     return PosScaffold(
       title: 'Manajemen produk',
       actions: [
+        IconButton(
+          tooltip: 'Kelola kategori',
+          onPressed: () => Navigator.push<void>(
+            context,
+            MaterialPageRoute(builder: (_) => const ManageCategoryPage()),
+          ).then((_) => ref.invalidate(managedProductsProvider)),
+          icon: const Icon(Icons.category),
+        ),
         IconButton(
           tooltip: 'Tambah produk',
           onPressed: () => _openEditor(context, ref, const [], null),
