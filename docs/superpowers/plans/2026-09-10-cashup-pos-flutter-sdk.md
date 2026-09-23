@@ -2012,7 +2012,7 @@ class TotalsPanel extends StatelessWidget {
 
 **Performance requirements for this task:** every widget here has a `const` constructor. `AsyncView` must not rebuild its data subtree when only the loading flag toggles — build the data branch from the `AsyncValue` directly rather than through a `StatefulWidget`.
 
-- [ ] **Step 1: Write the failing widget tests**
+- [x] **Step 1: Write the failing widget tests**
 
 ```dart
 // test/ui/widgets/async_view_test.dart
@@ -2095,13 +2095,13 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail** — `flutter test test/ui`
+- [x] **Step 2: Run to verify they fail** — `flutter test test/ui`
 
-- [ ] **Step 3: Implement `responsive.dart` and the eleven widgets**
+- [x] **Step 3: Implement `responsive.dart` and the eleven widgets**
 
-- [ ] **Step 4: Run to verify they pass** — `flutter test test/ui`
+- [x] **Step 4: Run to verify they pass** — `flutter test test/ui`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/ui/widgets lib/src/util/responsive.dart test/ui

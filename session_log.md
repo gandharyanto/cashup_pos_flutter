@@ -4,6 +4,13 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 17 complete; theme-application gap found and being fixed
+
+- **Task 17 (widget library — layout/async foundations) done**, reviewed clean, approved. Commit `8a93e40` — `feat(ui): shared layout, async-state and amount widgets`. 422/422 tests passing, analyze clean. All 14 shared widgets are `const`-constructible, zero unnecessary `StatefulWidget`s; `AsyncView`'s no-rebuild-on-loading-toggle claim was independently verified against Riverpod's actual `AsyncValue.when(skipLoadingOnRefresh: true)` default.
+- Ruled on a genuine spec self-contradiction: the design doc's own file-structure table types `PosLayout.of(BuildContext)` inside `util/responsive.dart`, contradicting its own stated "no BuildContext in util/" rule two paragraphs earlier. Ruling: deliberate, narrow, spec-sanctioned exception scoped to this one function (responsive/breakpoint detection is inherently UI-plumbing) — every other `util/` file stays pure.
+- **User explicitly asked that host apps be able to change the SDK's theme colors.** Investigated and confirmed a real, previously-undetected gap: `PosTheme.toThemeData()` (built in Task 16) is never actually applied anywhere — no `Theme`/`MaterialApp` wraps any SDK route, so a host's custom `PosConfig(theme: ...)` currently has zero visual effect. Reopened Task 16 with a scoped fix (wrap pushed routes in `Theme(data: CashupPos.config.theme.toThemeData(...), child: ...)`, plus a test proving a custom theme's color actually reaches a pushed page) — dispatched, in progress.
+- Plan checkboxes for Task 17 marked `[x]`.
+
 ## 2026-09-24 (continued) — Task 16 complete
 
 - **Task 16 (config/theme/SDK entry point) done**, reviewed clean, approved. Commit `e4d06ed` — `feat(sdk): public entry point, configuration and theme tokens`. 417/417 tests passing, analyze clean.
