@@ -293,6 +293,23 @@ void main() {
       expect(api.lastPath, 'pos/category/detail/4');
       expect(category.name, 'Makanan');
     });
+
+    test('throws badResponse when data is missing', () async {
+      final api = FakeApiClient({
+        'pos/category/detail/4': {'status': '200'},
+      });
+
+      expect(
+        () => PosRepositoryImpl(api).categoryDetail(4),
+        throwsA(
+          isA<PosException>().having(
+            (e) => e.kind,
+            'kind',
+            PosErrorKind.badResponse,
+          ),
+        ),
+      );
+    });
   });
 
   group('categoryCreate', () {
@@ -466,58 +483,96 @@ void main() {
   });
 
   group('paymentSettingCreate', () {
-    test('posts the setting to the create path', () async {
-      final api = FakeApiClient({
-        'pos/payment-setting/create': {'status': '200'},
-      });
+    test(
+      'posts a body with neither paymentSettingId nor receiptFooterText',
+      () async {
+        final api = FakeApiClient({
+          'pos/payment-setting/create': {'status': '200'},
+        });
 
-      await PosRepositoryImpl(api).paymentSettingCreate(
-        const PaymentSetting(
-          paymentSettingId: 0,
-          isPriceIncludeTax: false,
-          isRounding: false,
-          roundingTarget: 0,
-          roundingType: 'NONE',
-          isServiceCharge: false,
-          serviceChargePercentage: 0,
-          serviceChargeAmount: 0,
-          isTax: false,
-          taxPercentage: 0,
-          taxName: '',
-        ),
-      );
+        await PosRepositoryImpl(api).paymentSettingCreate(
+          const PaymentSetting(
+            paymentSettingId: 0,
+            isPriceIncludeTax: true,
+            isRounding: true,
+            roundingTarget: 100,
+            roundingType: 'UP',
+            isServiceCharge: true,
+            serviceChargePercentage: 5,
+            serviceChargeAmount: 0,
+            isTax: true,
+            taxPercentage: 10,
+            taxName: 'PPN',
+            receiptFooterText: 'Terima kasih',
+          ),
+        );
 
-      expect(api.lastMethod, 'POST');
-      expect(api.lastPath, 'pos/payment-setting/create');
-    });
+        expect(api.lastMethod, 'POST');
+        expect(api.lastPath, 'pos/payment-setting/create');
+        // Mirrors PosCreatePaymentSettingRequest.kt exactly — that DTO has
+        // no `paymentSettingId` (not assigned yet) and no
+        // `receiptFooterText` field at all.
+        expect(api.lastBody, {
+          'isPriceIncludeTax': true,
+          'isRounding': true,
+          'roundingTarget': 100,
+          'roundingType': 'UP',
+          'isServiceCharge': true,
+          'serviceChargePercentage': 5.0,
+          'serviceChargeAmount': 0.0,
+          'isTax': true,
+          'taxPercentage': 10.0,
+          'taxName': 'PPN',
+        });
+      },
+    );
   });
 
   group('paymentSettingUpdate', () {
-    test('puts the setting to the update path', () async {
-      final api = FakeApiClient({
-        'pos/payment-setting/update': {'status': '200'},
-      });
+    test(
+      'puts a body with paymentSettingId but no receiptFooterText',
+      () async {
+        final api = FakeApiClient({
+          'pos/payment-setting/update': {'status': '200'},
+        });
 
-      await PosRepositoryImpl(api).paymentSettingUpdate(
-        const PaymentSetting(
-          paymentSettingId: 1,
-          isPriceIncludeTax: false,
-          isRounding: false,
-          roundingTarget: 0,
-          roundingType: 'NONE',
-          isServiceCharge: false,
-          serviceChargePercentage: 0,
-          serviceChargeAmount: 0,
-          isTax: false,
-          taxPercentage: 0,
-          taxName: '',
-        ),
-      );
+        await PosRepositoryImpl(api).paymentSettingUpdate(
+          const PaymentSetting(
+            paymentSettingId: 1,
+            isPriceIncludeTax: false,
+            isRounding: false,
+            roundingTarget: 0,
+            roundingType: 'NONE',
+            isServiceCharge: false,
+            serviceChargePercentage: 0,
+            serviceChargeAmount: 0,
+            isTax: false,
+            taxPercentage: 0,
+            taxName: '',
+            receiptFooterText: 'Terima kasih',
+          ),
+        );
 
-      expect(api.lastMethod, 'PUT');
-      expect(api.lastPath, 'pos/payment-setting/update');
-      expect((api.lastBody as Map)['paymentSettingId'], 1);
-    });
+        expect(api.lastMethod, 'PUT');
+        expect(api.lastPath, 'pos/payment-setting/update');
+        // Mirrors PosUpdatePaymentSettingRequest.kt exactly — that DTO
+        // carries `paymentSettingId` (unlike create) but still has no
+        // `receiptFooterText` field.
+        expect(api.lastBody, {
+          'paymentSettingId': 1,
+          'isPriceIncludeTax': false,
+          'isRounding': false,
+          'roundingTarget': 0,
+          'roundingType': 'NONE',
+          'isServiceCharge': false,
+          'serviceChargePercentage': 0.0,
+          'serviceChargeAmount': 0.0,
+          'isTax': false,
+          'taxPercentage': 0.0,
+          'taxName': '',
+        });
+      },
+    );
   });
 
   group('paymentMethods', () {
@@ -600,6 +655,23 @@ void main() {
 
       expect(api.lastPath, 'pos/transaction/detail/91');
       expect(details.code, 'TRX-91');
+    });
+
+    test('throws badResponse when data is missing', () async {
+      final api = FakeApiClient({
+        'pos/transaction/detail/91': {'status': '200'},
+      });
+
+      expect(
+        () => PosRepositoryImpl(api).transactionDetail(91),
+        throwsA(
+          isA<PosException>().having(
+            (e) => e.kind,
+            'kind',
+            PosErrorKind.badResponse,
+          ),
+        ),
+      );
     });
   });
 
@@ -689,6 +761,26 @@ void main() {
         'endDate': '2026-09-10',
       });
       expect(report.productList.single.productName, 'Kopi');
+    });
+
+    test('throws badResponse when data is missing', () async {
+      final api = FakeApiClient({
+        'pos/summary-report/list': {'status': '200'},
+      });
+
+      expect(
+        () => PosRepositoryImpl(api).summaryReport(
+          startDate: DateTime(2026, 9, 1),
+          endDate: DateTime(2026, 9, 10),
+        ),
+        throwsA(
+          isA<PosException>().having(
+            (e) => e.kind,
+            'kind',
+            PosErrorKind.badResponse,
+          ),
+        ),
+      );
     });
   });
 

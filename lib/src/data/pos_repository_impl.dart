@@ -175,12 +175,18 @@ class PosRepositoryImpl implements PosRepository {
 
   @override
   Future<void> paymentSettingCreate(PaymentSetting setting) async {
-    await _api.post('pos/payment-setting/create', body: setting.toJson());
+    await _api.post(
+      'pos/payment-setting/create',
+      body: _paymentSettingCreateJson(setting),
+    );
   }
 
   @override
   Future<void> paymentSettingUpdate(PaymentSetting setting) async {
-    await _api.put('pos/payment-setting/update', body: setting.toJson());
+    await _api.put(
+      'pos/payment-setting/update',
+      body: _paymentSettingUpdateJson(setting),
+    );
   }
 
   @override
@@ -304,4 +310,33 @@ class PosRepositoryImpl implements PosRepository {
   /// request rather than sent as literal `null`.
   Map<String, dynamic> _query(Map<String, dynamic> raw) =>
       Map.fromEntries(raw.entries.where((entry) => entry.value != null));
+
+  /// The `pos/payment-setting/create` body.
+  ///
+  /// Deliberately narrower than `PaymentSetting.toJson()`: mirrors
+  /// `PosCreatePaymentSettingRequest.kt`, which has neither
+  /// `paymentSettingId` (not assigned yet) nor `receiptFooterText` (not a
+  /// field on that DTO at all).
+  Map<String, dynamic> _paymentSettingCreateJson(PaymentSetting setting) => {
+    'isPriceIncludeTax': setting.isPriceIncludeTax,
+    'isRounding': setting.isRounding,
+    'roundingTarget': setting.roundingTarget,
+    'roundingType': setting.roundingType,
+    'isServiceCharge': setting.isServiceCharge,
+    'serviceChargePercentage': setting.serviceChargePercentage,
+    'serviceChargeAmount': setting.serviceChargeAmount,
+    'isTax': setting.isTax,
+    'taxPercentage': setting.taxPercentage,
+    'taxName': setting.taxName,
+  };
+
+  /// The `pos/payment-setting/update` body.
+  ///
+  /// Mirrors `PosUpdatePaymentSettingRequest.kt`: carries `paymentSettingId`
+  /// (unlike create), but still no `receiptFooterText` — that DTO doesn't
+  /// declare the field either.
+  Map<String, dynamic> _paymentSettingUpdateJson(PaymentSetting setting) => {
+    'paymentSettingId': setting.paymentSettingId,
+    ..._paymentSettingCreateJson(setting),
+  };
 }
