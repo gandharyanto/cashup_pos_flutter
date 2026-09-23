@@ -1741,7 +1741,7 @@ class QrisPayload {
 enum QrisStatus { pending, paid, failed, expired }
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```dart
 // test/payment/payment_result_test.dart
@@ -1770,13 +1770,13 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `flutter test test/payment`
+- [x] **Step 2: Run to verify it fails** — `flutter test test/payment`
 
-- [ ] **Step 3: Implement the three files**
+- [x] **Step 3: Implement the three files**
 
-- [ ] **Step 4: Run to verify it passes** — `flutter test test/payment`
+- [x] **Step 4: Run to verify it passes** — `flutter test test/payment`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/payment test/payment
