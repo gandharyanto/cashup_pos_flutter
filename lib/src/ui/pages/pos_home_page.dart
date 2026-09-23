@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 export 'product_browse_page.dart' show ProductBrowsePane;
+export 'cart_page.dart' show CartPane;
 
 import '../../state/cart_controller.dart';
 import '../../util/responsive.dart';
@@ -10,6 +11,7 @@ import '../widgets/pos_mode_selector.dart';
 import '../widgets/pos_panel.dart';
 import '../widgets/pos_scaffold.dart';
 import 'product_browse_page.dart';
+import 'cart_page.dart';
 
 /// Responsive entry shell shared by the phone and tablet POS experiences.
 class PosHomePage extends ConsumerWidget {
@@ -61,14 +63,6 @@ class PosHomePage extends ConsumerWidget {
       builder: (_) => const SafeArea(child: CartPane()),
     );
   }
-}
-
-/// Task 25 fills this pane with cart lines, savings, and checkout totals.
-class CartPane extends StatelessWidget {
-  const CartPane({super.key});
-
-  @override
-  Widget build(BuildContext context) => const Center(child: Text('Keranjang'));
 }
 
 /// Task 35 replaces this shell placeholder with the amount keypad flow.

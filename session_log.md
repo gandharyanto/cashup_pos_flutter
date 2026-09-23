@@ -4,6 +4,11 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 25 complete — cart and promotion UI
+
+- **Task 25 done.** Added the phone cart page and tablet cart pane, virtualized per-line controls with savings labels, full totals breakdown, eligibility-aware discount/promotion pickers, and reward selection wired into checkout state.
+- 492/492 tests passing; `flutter analyze` clean. Next: Task 26 payment method and cash dialog.
+
 ## 2026-09-24 (continued) — Task 24 complete — product browsing and options
 
 - **Task 24 (`ProductBrowsePage` and `ProductVariantSheet`) done.** The home shell now uses the real virtualized catalogue with debounced search, in-memory category filtering, grid/list switching, stock state, image resolution, and narrowly selected per-product cart quantities.
