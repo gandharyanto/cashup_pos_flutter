@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/pos_config.dart';
+import 'state/pos_providers.dart';
 
 /// Owns the SDK's lifecycle: the host's [PosConfig] and the
 /// [ProviderContainer] every SDK screen reads from via
@@ -68,8 +69,9 @@ class CashupPos {
   /// disposes the previous container first, so a host that re-initializes
   /// (e.g. after switching merchant accounts) never leaks the old one.
   ///
-  /// Provider registration is added in a later task (`pos_providers.dart`,
-  /// Task 20) — today the container is created empty.
+  /// The container overrides `posConfigProvider` with the normalized
+  /// config — every other provider in `pos_providers.dart` derives from it,
+  /// so nothing else needs to be wired here.
   static Future<void> initialize(PosConfig config) async {
     _container?.dispose();
 
@@ -92,7 +94,9 @@ class CashupPos {
           );
 
     _config = normalized;
-    _container = ProviderContainer();
+    _container = ProviderContainer(
+      overrides: [posConfigProvider.overrideWithValue(normalized)],
+    );
   }
 
   /// Disposes the provider container and clears the stored configuration.
