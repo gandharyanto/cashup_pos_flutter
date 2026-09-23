@@ -20,6 +20,7 @@ import '../data/pos_repository.dart';
 import '../data/pos_repository_impl.dart';
 import '../models/discount_item.dart';
 import '../models/payment_setting.dart';
+import '../models/pos_payment_method.dart';
 import '../models/promotion_item.dart';
 import 'catalog_controller.dart';
 
@@ -59,6 +60,10 @@ final catalogControllerProvider =
 /// yet.
 final paymentSettingProvider = FutureProvider<PaymentSetting?>(
   (ref) => ref.watch(posRepositoryProvider).paymentSetting(),
+);
+
+final paymentMethodsProvider = FutureProvider<List<PosPaymentMethod>>(
+  (ref) => ref.watch(posRepositoryProvider).paymentMethods(),
 );
 
 /// Discounts the cashier may apply by hand.
