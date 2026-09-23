@@ -8,11 +8,10 @@ import 'package:cashup_pos/src/data/pos_exception.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-typedef _Handler =
-    Future<ResponseBody> Function(
-      RequestOptions options,
-      Stream<Uint8List>? requestStream,
-    );
+typedef _Handler = Future<ResponseBody> Function(
+  RequestOptions options,
+  Stream<Uint8List>? requestStream,
+);
 
 class _StubAdapter implements HttpClientAdapter {
   _StubAdapter(this.handler);
@@ -125,15 +124,10 @@ void main() {
     await expectLater(client.get('pos/category/list'), completes);
   });
 
-  test(
-    '`status` in the body is ignored — a bare {"status":"400"} still succeeds on HTTP 200',
-    () async {
-      final client = clientWith(
-        (options, _) async => okBody('{"status":"400"}'),
-      );
-      await expectLater(client.get('pos/category/list'), completes);
-    },
-  );
+  test('`status` in the body is ignored — a bare {"status":"400"} still succeeds on HTTP 200', () async {
+    final client = clientWith((options, _) async => okBody('{"status":"400"}'));
+    await expectLater(client.get('pos/category/list'), completes);
+  });
 
   for (final code in ['00', '0P01', '200']) {
     test('a body code of "$code" succeeds', () async {
@@ -144,66 +138,54 @@ void main() {
     });
   }
 
-  test(
-    'response_code "05" fails with the body message, code read from response_code',
-    () async {
-      final client = clientWith(
-        (options, _) async =>
-            okBody('{"response_code":"05","message":"x"}'),
-      );
-
-      expect(
-        () => client.get('pos/category/list'),
-        throwsA(
-          isA<PosException>()
-              .having((e) => e.kind, 'kind', PosErrorKind.unknown)
-              .having((e) => e.message, 'message', 'x')
-              .having((e) => e.code, 'code', '05'),
-        ),
-      );
-    },
-  );
-
-  test('the `msg` alternate is used as the message when `message` is absent', () async {
+  test('response_code "05" fails with the body message, code read from response_code', () async {
     final client = clientWith(
-      (options, _) async => okBody('{"response_code":"05","msg":"pakai msg"}'),
+      (options, _) async => okBody('{"response_code":"05","message":"x"}'),
     );
 
     expect(
       () => client.get('pos/category/list'),
       throwsA(
-        isA<PosException>().having(
-          (e) => e.message,
-          'message',
-          'pakai msg',
-        ),
+        isA<PosException>()
+            .having((e) => e.kind, 'kind', PosErrorKind.unknown)
+            .having((e) => e.message, 'message', 'x')
+            .having((e) => e.code, 'code', '05'),
       ),
     );
   });
 
   test(
-    'a body code that is shorter than 2 characters does not match the "00" prefix rule',
+    'the `msg` alternate is used as the message when `message` is absent',
     () async {
       final client = clientWith(
-        (options, _) async => okBody('{"code":"5"}'),
+        (options, _) async =>
+            okBody('{"response_code":"05","msg":"pakai msg"}'),
       );
 
       expect(
         () => client.get('pos/category/list'),
-        throwsA(isA<PosException>().having((e) => e.kind, 'kind', PosErrorKind.unknown)),
+        throwsA(
+          isA<PosException>().having((e) => e.message, 'message', 'pakai msg'),
+        ),
       );
     },
   );
 
-  test(
-    'a body code that starts with 200 (contains rule) succeeds',
-    () async {
-      final client = clientWith(
-        (options, _) async => okBody('{"code":"20099"}'),
-      );
-      await expectLater(client.get('pos/category/list'), completes);
-    },
-  );
+  test('a body code that is shorter than 2 characters does not match the "00" prefix rule', () async {
+    final client = clientWith((options, _) async => okBody('{"code":"5"}'));
+
+    expect(
+      () => client.get('pos/category/list'),
+      throwsA(
+        isA<PosException>().having((e) => e.kind, 'kind', PosErrorKind.unknown),
+      ),
+    );
+  });
+
+  test('a body code that starts with 200 (contains rule) succeeds', () async {
+    final client = clientWith((options, _) async => okBody('{"code":"20099"}'));
+    await expectLater(client.get('pos/category/list'), completes);
+  });
 
   test(
     'a malformed (non-JSON) body raises a badResponse PosException',
