@@ -49,7 +49,7 @@ void main() {
       unawaited(CashupPosLauncher.open(hostContext));
       await tester.pumpAndSettle();
 
-      final pushedContext = tester.element(find.text('POS'));
+      final pushedContext = tester.element(find.text('Pilih produk'));
       final themeOnPushedPage = Theme.of(pushedContext);
 
       expect(

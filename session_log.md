@@ -4,6 +4,12 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 23 complete — responsive POS shell
+
+- **Task 23 (responsive shell and home page) done.** `CashupPosLauncher.open` now pushes the real `PosHomePage` through the existing SDK-owned Riverpod scope and host-configured theme. Phone renders one selling pane plus a pinned cart summary; tablet/wide renders the required 60/40 browse-and-cart panels.
+- Added the Simple/POS segmented selector, online status dot, narrow cart quantity/subtotal watches, and placeholder pane seams for Tasks 24, 25, and 35. The phone cart summary opens the cart pane while the full `CartPage` arrives in Task 25.
+- 488/488 tests passing; `flutter analyze` clean. Next: Task 24 (`ProductBrowsePage` and `ProductVariantSheet`).
+
 ## 2026-09-24 (continued) — Task 22 complete — memoised checkout state
 
 - **Task 22 (checkout state with memoised calculation) done.** Added Kotlin-parity mappers for discounts, promotions, reward selections, schedules, scopes, and cart lines; checkout now calculates totals/savings, applies discounts and reward selections, switches payment methods, and builds transaction payloads.

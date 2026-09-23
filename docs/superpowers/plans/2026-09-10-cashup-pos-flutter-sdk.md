@@ -2973,7 +2973,7 @@ git commit -m "feat(state): checkout controller with memoised transaction calcul
 - `PosFormFactor.tablet` / `.wide` — `Row` with the browse pane at flex 6 and the cart pane at flex 4, both inside `PosPanel`, mirroring the Kotlin weights.
 - The mode selector sits in the app bar in both cases; `PosMode.simple` swaps the browse pane for `SimpleAmountPage`.
 
-- [ ] **Step 1: Write the failing layout test**
+- [x] **Step 1: Write the failing layout test**
 
 ```dart
 // test/ui/pages/pos_home_page_test.dart
@@ -3019,13 +3019,13 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `flutter test test/ui/pages`
+- [x] **Step 2: Run to verify it fails** — `flutter test test/ui/pages`
 
-- [ ] **Step 3: Implement the shell**
+- [x] **Step 3: Implement the shell**
 
-- [ ] **Step 4: Run to verify it passes** — `flutter test test/ui`
+- [x] **Step 4: Run to verify it passes** — `flutter test test/ui`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/ui test

@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/pos_config.dart';
 import 'state/pos_providers.dart';
+import 'ui/pages/pos_home_page.dart';
 
 /// Owns the SDK's lifecycle: the host's [PosConfig] and the
 /// [ProviderContainer] every SDK screen reads from via
@@ -125,10 +126,9 @@ class CashupPos {
 class CashupPosLauncher {
   CashupPosLauncher._();
 
-  /// Opens the main POS entry page. Wired to the real page in Task 23 —
-  /// today it pushes [_PosPlaceholderPage].
+  /// Opens the responsive main POS entry page.
   static Future<void> open(BuildContext context) =>
-      _openPlaceholder(context, 'POS');
+      _openPage(context, const PosHomePage());
 
   /// Opens the transaction history / list page.
   static Future<void> openTransactions(BuildContext context) =>
@@ -143,15 +143,17 @@ class CashupPosLauncher {
       _openPlaceholder(context, 'Pengaturan');
 
   static Future<void> _openPlaceholder(BuildContext context, String title) {
+    return _openPage(context, _PosPlaceholderPage(title: title));
+  }
+
+  static Future<void> _openPage(BuildContext context, Widget page) {
     if (!CashupPos.isInitialized) {
       throw StateError(
         'CashupPos.initialize() must be called before opening the POS UI.',
       );
     }
     return Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => _wrapPage(context, _PosPlaceholderPage(title: title)),
-      ),
+      MaterialPageRoute<void>(builder: (_) => _wrapPage(context, page)),
     );
   }
 
