@@ -12,6 +12,7 @@ import '../widgets/pos_panel.dart';
 import '../widgets/pos_scaffold.dart';
 import 'product_browse_page.dart';
 import 'cart_page.dart';
+import 'pos_menu_page.dart';
 
 /// Responsive entry shell shared by the phone and tablet POS experiences.
 class PosHomePage extends ConsumerWidget {
@@ -38,6 +39,14 @@ class PosHomePage extends ConsumerWidget {
           ),
         ),
         const SizedBox(width: 12),
+        IconButton(
+          tooltip: 'Menu POS',
+          onPressed: () => Navigator.push<void>(
+            context,
+            MaterialPageRoute(builder: (_) => const PosMenuPage()),
+          ),
+          icon: const Icon(Icons.menu),
+        ),
       ],
       padding: const EdgeInsets.all(12),
       body: layout.isPhone

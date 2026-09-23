@@ -3050,7 +3050,7 @@ Each screen task follows the same five-step shape as Task 23 — write the widge
 | 31 ✅ | `ManageProductPage` (list/add/edit/detail), `StockMovementPage` | `ManageProductActivity` + fragments, `StockMovementActivity` | create/update validation; category multi-select; stock update with movement type; movement history paged by date range |
 | 32 ✅ | `ManageCategoryPage` (list/add/edit/detail) | `ManageCategoryActivity` + fragments | create/update/delete with confirmation; deleting a category in use surfaces the backend message |
 | 33 ✅ | `PaymentSettingPage`, `ReceiptConfigPage` | `PaymentSettingActivity`, `PosReceiptConfigActivity` | rounding target/type, service charge percentage vs amount (mutually exclusive), tax name and percentage, price-include-tax; missing settings offer to create defaults; receipt header/footer text |
-| 34 | `SummaryReportPage`, `PosMenuPage` | `PosSummaryReportActivity`, `TabletMenuActivity` | product sales and payment breakdown over a date range; menu gates entries on `PosFeatureFlags`; menu carries the catalogue refresh action that replaces `SyncActivity` |
+| 34 ✅ | `SummaryReportPage`, `PosMenuPage` | `PosSummaryReportActivity`, `TabletMenuActivity` | product sales and payment breakdown over a date range; menu gates entries on `PosFeatureFlags`; menu carries the catalogue refresh action that replaces `SyncActivity` |
 | 35 | `SimpleAmountPage` | `CalculatorActivity`, `PosAmountFragment` | keypad-driven amount; charge routes into the same payment flow with a single synthetic line; no catalogue required |
 
 ---

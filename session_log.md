@@ -1,5 +1,10 @@
 # Session Log
 
+## 2026-09-24 (continued) — Task 34 complete — summary report and menu
+
+- **Task 34 done.** Added date-filtered product/payment sales reporting, feature-flag-gated POS menu entries, and catalogue refresh replacing the legacy sync screen. The home page now exposes the menu.
+- 505/505 tests passing; analyzer clean. Next: Task 35 simple amount flow.
+
 ## 2026-09-24 (continued) — Task 33 complete — payment and receipt settings
 
 - **Task 33 done.** Added creation of safe default settings, rounding, mutually exclusive percentage/nominal service charge, tax and included-tax controls, plus merchant header preview and editable receipt footer. The settings launcher now opens the real page.
