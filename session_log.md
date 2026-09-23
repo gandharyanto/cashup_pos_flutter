@@ -1,5 +1,10 @@
 # Session Log
 
+## 2026-09-24 (continued) — Task 31 complete — product and stock management
+
+- **Task 31 done.** Added product list/detail/create/update flows with validation and category multi-select, plus dated stock movement history and IN/OUT stock updates. The product-management launcher now opens the real page.
+- 502/502 tests passing; analyzer clean. Next: Task 32 category management.
+
 ## 2026-09-24 (continued) — Task 30 complete — transaction history
 
 - **Task 30 done.** Transaction history now filters by date range, loads 20 records per page through `PagedListView`, and opens an API-backed detail with status, item option summaries, totals, and receipt navigation. The public launcher now opens the real history page.

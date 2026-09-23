@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/pos_config.dart';
 import 'state/pos_providers.dart';
+import 'ui/pages/manage_product_page.dart';
 import 'ui/pages/pos_home_page.dart';
 import 'ui/pages/transaction_list_page.dart';
 
@@ -137,7 +138,7 @@ class CashupPosLauncher {
 
   /// Opens product and category management.
   static Future<void> openProductManagement(BuildContext context) =>
-      _openPlaceholder(context, 'Manajemen Produk');
+      _openPage(context, const ManageProductPage());
 
   /// Opens POS settings (payment setting, receipt footer, etc).
   static Future<void> openSettings(BuildContext context) =>
