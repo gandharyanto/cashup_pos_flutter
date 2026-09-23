@@ -4,6 +4,13 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 14 complete
+
+- **Task 14 (`PosRepository` interface + online implementation) done**, reviewed, one fix round, re-verified clean. Final commits `652f498` → `3a534b9` (`feat(data): PosRepository interface and online implementation` + `fix(data): narrow payment-setting request bodies to match backend DTOs`). 414/414 tests passing, analyze clean.
+- Review round 1 confirmed every one of ~20 endpoints against the live Kotlin `PosRepositoryImpl.kt`/`PosService.kt` and flagged one Important issue: `paymentSettingCreate`/`paymentSettingUpdate` were reusing `PaymentSetting.toJson()` wholesale, sending `paymentSettingId`/`receiptFooterText` fields the backend's actual request DTOs don't declare. Fixed with narrow `_paymentSettingCreateJson`/`_paymentSettingUpdateJson` helpers + body-shape tests. Also added 3 missing `badResponse` tests (Minor finding).
+- Two informational (non-defect) notes carried forward for later tasks: `categoryList`'s default `size=100` vs. Kotlin's call-site `size=100000` ("fetch all" intent) — worth revisiting when building category-list UI; `transactionList`'s sort defaults differ slightly from Kotlin's runtime-normalized defaults — brief-mandated, not a port gap.
+- Plan checkboxes for Task 14 marked `[x]`.
+
 ## 2026-09-24 (continued) — Task 15 complete
 
 - **Task 15 (payment contracts) done**, reviewed clean, approved. Commit `7945384` — `feat(payment): host-implemented payment handler and QRIS gateway contracts`. 377/377 tests passing, analyze clean.
