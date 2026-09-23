@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/pos_config.dart';
 import 'state/pos_providers.dart';
 import 'ui/pages/pos_home_page.dart';
+import 'ui/pages/transaction_list_page.dart';
 
 /// Owns the SDK's lifecycle: the host's [PosConfig] and the
 /// [ProviderContainer] every SDK screen reads from via
@@ -132,7 +133,7 @@ class CashupPosLauncher {
 
   /// Opens the transaction history / list page.
   static Future<void> openTransactions(BuildContext context) =>
-      _openPlaceholder(context, 'Transaksi');
+      _openPage(context, const TransactionListPage());
 
   /// Opens product and category management.
   static Future<void> openProductManagement(BuildContext context) =>

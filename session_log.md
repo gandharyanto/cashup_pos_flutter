@@ -1,5 +1,10 @@
 # Session Log
 
+## 2026-09-24 (continued) — Task 30 complete — transaction history
+
+- **Task 30 done.** Transaction history now filters by date range, loads 20 records per page through `PagedListView`, and opens an API-backed detail with status, item option summaries, totals, and receipt navigation. The public launcher now opens the real history page.
+- 501/501 tests passing; analyzer clean. Next: Task 31 product and stock management.
+
 ## 2026-09-24 (continued) — Task 29 complete — receipt
 
 - **Task 29 done.** Added reusable 58 mm/80 mm receipt rendering and a receipt page with merchant header, ordered item/detail rows, notes, pricing breakdown, payment/cash information, queue number, and configured footer.
