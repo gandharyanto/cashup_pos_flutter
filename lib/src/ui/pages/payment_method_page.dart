@@ -5,13 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/pos_config.dart';
 import '../../models/pos_payment_method.dart';
+import '../../payment/qris_gateway.dart';
 import '../../state/pos_providers.dart';
+import '../../state/payment_controller.dart';
 import '../../util/currency.dart';
 import '../widgets/async_view.dart';
 import '../widgets/numeric_keypad.dart';
 import '../widgets/payment_method_tile.dart';
 import '../widgets/pos_dialog.dart';
 import '../widgets/pos_scaffold.dart';
+import 'payment_result_page.dart';
+import 'qris_payment_dialog.dart';
 
 List<double> cashQuickAmounts(double amount) {
   final values = <double>[amount % 1 < .01 ? amount.roundToDouble() : amount];
@@ -51,9 +55,9 @@ class PaymentMethodPage extends ConsumerWidget {
           return ListView(
             children: [
               if (internal.isNotEmpty) const Text('Pembayaran internal'),
-              ...internal.map((m) => _tile(context, m)),
+              ...internal.map((m) => _tile(context, ref, config, m)),
               if (external.isNotEmpty) const Text('Pembayaran eksternal'),
-              ...external.map((m) => _tile(context, m)),
+              ...external.map((m) => _tile(context, ref, config, m)),
             ],
           );
         },
@@ -68,14 +72,76 @@ class PaymentMethodPage extends ConsumerWidget {
         false;
   }
 
-  Widget _tile(BuildContext context, PosPaymentMethod method) =>
-      PaymentMethodTile(
-        name: method.name,
-        code: method.code,
-        onTap: method.isCash
-            ? () => showCashPaymentDialog(context, total: total)
-            : null,
+  Widget _tile(
+    BuildContext context,
+    WidgetRef ref,
+    PosConfig config,
+    PosPaymentMethod method,
+  ) => PaymentMethodTile(
+    name: method.name,
+    code: method.code,
+    onTap: () => _pay(context, ref, config, method),
+  );
+
+  Future<void> _pay(
+    BuildContext context,
+    WidgetRef ref,
+    PosConfig config,
+    PosPaymentMethod method,
+  ) async {
+    String tendered = '0';
+    String change = '0';
+    if (method.isCash) {
+      final cash = await showCashPaymentDialog(context, total: total);
+      if (cash == null || !context.mounted) return;
+      tendered = cash.tendered.toStringAsFixed(2);
+      change = cash.change.toStringAsFixed(2);
+    } else if (method.isQris) {
+      final gateway = config.qrisGateway;
+      if (gateway == null) return;
+      final status = await showQrisPaymentDialog(
+        context,
+        gateway: gateway,
+        amount: total,
       );
+      if (status != QrisStatus.paid || !context.mounted) return;
+    }
+    final created = await ref
+        .read(paymentControllerProvider.notifier)
+        .process(
+          method: method.code,
+          cashTendered: tendered,
+          cashChange: change,
+        );
+    if (!context.mounted) return;
+    if (created != null) {
+      await Navigator.pushReplacement<void, void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentResultPage(transaction: created),
+        ),
+      );
+      return;
+    }
+    final state = ref.read(paymentControllerProvider);
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          state.status == PaymentFlowStatus.indeterminate
+              ? 'Periksa transaksi'
+              : 'Pembayaran gagal',
+        ),
+        content: Text(state.message ?? 'Terjadi kesalahan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Future<({double tendered, double change})?> showCashPaymentDialog(

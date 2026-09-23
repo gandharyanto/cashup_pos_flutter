@@ -4,6 +4,11 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 28 complete — payment orchestration
+
+- **Task 28 done.** Cash/QRIS/host card flows converge on one transaction-create path; host failures stop before create, success clears cart and routes to a result page, and lost create responses become an explicit indeterminate state with no automatic retry.
+- 497/497 tests passing; analyzer clean. Next: Task 29 receipt.
+
 ## 2026-09-24 (continued) — Task 27 complete — QRIS dialog
 
 - **Task 27 done.** QR generation, isolated QR repaint boundary, three-second polling, terminal-state shutdown, cancellation cleanup, and failure rendering are implemented and tested.
