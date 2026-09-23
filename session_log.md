@@ -1,5 +1,10 @@
 # Session Log
 
+## 2026-09-24 (continued) — Task 29 complete — receipt
+
+- **Task 29 done.** Added reusable 58 mm/80 mm receipt rendering and a receipt page with merchant header, ordered item/detail rows, notes, pricing breakdown, payment/cash information, queue number, and configured footer.
+- 499/499 tests passing; analyzer clean. Next: Task 30 transaction history and detail.
+
 Running log of changes made during Claude Code sessions on `cashup_pos_flutter`. Newest entry on top. This complements — does not replace — the plan's checkbox record in `docs/superpowers/plans/2026-09-10-cashup-pos-flutter-sdk.md` and the per-session snapshots in `~/.claude/session-data/`.
 
 ---
