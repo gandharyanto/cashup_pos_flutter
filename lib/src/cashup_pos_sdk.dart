@@ -108,8 +108,16 @@ class CashupPos {
 ///
 /// Every method wraps its route in
 /// `UncontrolledProviderScope(container: CashupPos.container, child: ...)`
-/// so SDK state never touches the host's own Riverpod graph, and requires
-/// [CashupPos.initialize] to have run first.
+/// **and** a `Theme` built from `CashupPos.config.theme.toThemeData(...)`
+/// (via [_wrapPage]) so SDK state never touches the host's own Riverpod
+/// graph and every SDK page actually reflects the host's configured
+/// [PosTheme] — not just whatever `Theme.of(context)` the host's app
+/// happens to be using at the push site. Requires [CashupPos.initialize]
+/// to have run first.
+///
+/// **Every future route this SDK pushes (Task 23+ included) must go
+/// through [_wrapPage]** — it is the one place theming is applied, and a
+/// page pushed any other way silently ignores the host's `PosTheme`.
 class CashupPosLauncher {
   CashupPosLauncher._();
 
@@ -138,10 +146,29 @@ class CashupPosLauncher {
     }
     return Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => UncontrolledProviderScope(
-          container: CashupPos.container,
-          child: _PosPlaceholderPage(title: title),
-        ),
+        builder: (_) => _wrapPage(context, _PosPlaceholderPage(title: title)),
+      ),
+    );
+  }
+
+  /// Wraps [child] in the provider scope and theme every SDK-pushed route
+  /// needs. [context] is the pushing context — read synchronously (before
+  /// any `await`), so it is still valid here even though this runs inside
+  /// a `MaterialPageRoute.builder` callback.
+  ///
+  /// Brightness is taken from `Theme.of(context).brightness` — the host
+  /// app's *current* light/dark mode at push time — rather than
+  /// `MediaQuery.platformBrightnessOf(context)` (the OS-level setting).
+  /// This makes the SDK follow whatever light/dark mode the host app is
+  /// actually rendering in, including a host that overrides the platform
+  /// brightness (e.g. a manual in-app theme toggle) rather than diverging
+  /// from it.
+  static Widget _wrapPage(BuildContext context, Widget child) {
+    return UncontrolledProviderScope(
+      container: CashupPos.container,
+      child: Theme(
+        data: CashupPos.config.theme.toThemeData(Theme.of(context).brightness),
+        child: child,
       ),
     );
   }
