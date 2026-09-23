@@ -4,6 +4,15 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 19 complete — widget library finished
+
+- **Task 19 (product tile, cart line, payment method tile, option-group selector, paged list) done**, reviewed clean, approved. Commit `1a8b27e` — `feat(ui): product tile, cart line, option selector and paged list`. 468/468 tests passing, analyze clean.
+- **All 6 performance requirements — the user's explicit smooth-scrolling priority — independently verified in review, not just claimed:** `PosProductTile`'s `RepaintBoundary` is the literal outermost returned widget; `PagedListView.onLoadMore` fires from a `ScrollController` listener checking a 240px threshold against `maxScrollExtent`, never from a sentinel item re-evaluated per frame; `ImageThumb` passes device-pixel-ratio-aware `cacheWidth`/`cacheHeight` (stronger than the spec required); every widget except `PagedListView` (correctly stateful — owns the scroll controller) is `StatelessWidget` with `const` constructors.
+- Used `RadioGroup<int>` instead of the deprecated `RadioListTile.groupValue`/`.onChanged` (required to keep `flutter analyze`'s zero-tolerance gate clean on Flutter 3.47.5) — verified as the correct modern pattern.
+- `OptionGroupSelector`'s value types (`PosOptionGroup`/`PosOptionChoice`) were invented locally since the brief left them untyped and widgets can't import `models/` — cross-checked against `lib/src/models/option_group.dart` and confirmed as a sound, complete inference.
+- **Widget library (Tasks 17-19) is now fully complete** — 32 shared widgets across layout/async, inputs/overlays, and domain display. Next: Task 20 starts the Riverpod state layer.
+- 2 Minor findings deferred (a doc-comment overclaim, one untested success path) — none blocking.
+
 ## 2026-09-24 (continued) — Task 18 complete
 
 - **Task 18 (search field, quantity stepper, numeric keypad, dialogs, sheets, date range, status badge) done**, reviewed clean, approved. Commit `c665954` — `feat(ui): search, quantity stepper, numeric keypad and overlay chrome`. 450/450 tests passing, analyze clean.

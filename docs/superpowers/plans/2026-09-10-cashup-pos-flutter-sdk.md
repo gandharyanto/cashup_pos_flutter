@@ -2420,7 +2420,7 @@ class PagedListView<T> extends StatefulWidget {
 
 **Performance requirements for this task:** `PosProductTile` is wrapped in a `RepaintBoundary` at its root. `PagedListView` uses `ListView.builder` with `itemExtent` when the caller supplies one, and triggers `onLoadMore` from a scroll extent threshold rather than by building a sentinel item on every frame.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```dart
 // test/util/image_url_test.dart
@@ -2549,13 +2549,13 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail** — `flutter test test/ui test/util`
+- [x] **Step 2: Run to verify they fail** — `flutter test test/ui test/util`
 
-- [ ] **Step 3: Implement the helper and the eight widgets**
+- [x] **Step 3: Implement the helper and the eight widgets**
 
-- [ ] **Step 4: Run to verify they pass** — `flutter test`
+- [x] **Step 4: Run to verify they pass** — `flutter test`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/ui/widgets lib/src/util/image_url.dart test
