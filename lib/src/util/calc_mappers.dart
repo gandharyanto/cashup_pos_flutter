@@ -75,7 +75,7 @@ CartItemData toCartItemData(PosCartLine line) {
     taxId: product.tax?.taxId,
     taxName: product.tax?.taxName,
     taxPercentage: product.tax?.taxPercentage,
-    variantId: line.selectedVariants.firstOrNull?.id,
+    variantId: line.selectedVariants.lastOrNull?.id,
     selectedVariants: line.selectedVariants,
     selectedModifiers: line.selectedModifiers,
     categoryIds: product.categoryIds,
