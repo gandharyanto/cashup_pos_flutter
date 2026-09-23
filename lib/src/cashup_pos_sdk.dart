@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/pos_config.dart';
 import 'state/pos_providers.dart';
 import 'ui/pages/manage_product_page.dart';
+import 'ui/pages/payment_setting_page.dart';
 import 'ui/pages/pos_home_page.dart';
 import 'ui/pages/transaction_list_page.dart';
 
@@ -142,11 +143,7 @@ class CashupPosLauncher {
 
   /// Opens POS settings (payment setting, receipt footer, etc).
   static Future<void> openSettings(BuildContext context) =>
-      _openPlaceholder(context, 'Pengaturan');
-
-  static Future<void> _openPlaceholder(BuildContext context, String title) {
-    return _openPage(context, _PosPlaceholderPage(title: title));
-  }
+      _openPage(context, const PaymentSettingPage());
 
   static Future<void> _openPage(BuildContext context, Widget page) {
     if (!CashupPos.isInitialized) {
@@ -178,24 +175,6 @@ class CashupPosLauncher {
         data: CashupPos.config.theme.toThemeData(Theme.of(context).brightness),
         child: child,
       ),
-    );
-  }
-}
-
-/// Stand-in page pushed by every [CashupPosLauncher] method until the real
-/// pages exist (Tasks 23+). Deliberately minimal: it proves the navigation
-/// and provider-scope wiring work without pretending any real screen is
-/// built yet.
-class _PosPlaceholderPage extends StatelessWidget {
-  const _PosPlaceholderPage({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: const Center(child: Text('Belum tersedia di build ini.')),
     );
   }
 }

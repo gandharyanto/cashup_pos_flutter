@@ -1,5 +1,10 @@
 # Session Log
 
+## 2026-09-24 (continued) — Task 33 complete — payment and receipt settings
+
+- **Task 33 done.** Added creation of safe default settings, rounding, mutually exclusive percentage/nominal service charge, tax and included-tax controls, plus merchant header preview and editable receipt footer. The settings launcher now opens the real page.
+- 504/504 tests passing; analyzer clean. Next: Task 34 summary report and menu.
+
 ## 2026-09-24 (continued) — Task 32 complete — category management
 
 - **Task 32 done.** Added category list/detail/create/update/delete flows, required-name validation, destructive confirmation, and direct backend error display for categories still in use. Product management links to the category screen.
