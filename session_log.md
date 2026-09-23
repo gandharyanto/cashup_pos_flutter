@@ -4,6 +4,13 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 18 complete
+
+- **Task 18 (search field, quantity stepper, numeric keypad, dialogs, sheets, date range, status badge) done**, reviewed clean, approved. Commit `c665954` — `feat(ui): search, quantity stepper, numeric keypad and overlay chrome`. 450/450 tests passing, analyze clean.
+- `NumericKeypad`'s no-rebuild-on-keypress performance requirement independently verified at the architecture level: it contains zero `ValueListenableBuilder`s and never reads the `ValueNotifier` in its own `build()` — the caller's `State` builds it once and it's never touched again on a keystroke, a stronger guarantee than the brief's literal "const children" phrasing implied.
+- Numeric keypad sanitize/normalize logic (append, backspace, leading-zero trim, decimal point, maxLength) verified as a faithful line-for-line port of the Kotlin `NumericKeypadBottomSheet.kt`.
+- 3 Minor findings deferred (doc wording, one weak test name, one hardcoded badge color) — none blocking.
+
 ## 2026-09-24 (continued) — Theme customization fix verified
 
 - **Theme-application fix confirmed working**, re-reviewed clean. Commit `7380d29` — `fix(sdk): apply the host's PosTheme to pushed SDK routes`. 423/423 tests passing, analyze clean.

@@ -2192,7 +2192,7 @@ class StatusBadge extends StatelessWidget {
 }
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```dart
 // test/ui/widgets/qty_stepper_test.dart
@@ -2320,15 +2320,15 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail** — `flutter test test/ui test/util`
+- [x] **Step 2: Run to verify they fail** — `flutter test test/ui test/util`
 
-- [ ] **Step 3: Implement the helpers and widgets**
+- [x] **Step 3: Implement the helpers and widgets**
 
 `NumericKeypad` builds its twelve buttons once as `const` children and wraps only the caller's amount display in a `ValueListenableBuilder`. That is the point of taking a `ValueNotifier` rather than a `String` plus callback.
 
-- [ ] **Step 4: Run to verify they pass** — `flutter test test/ui test/util`
+- [x] **Step 4: Run to verify they pass** — `flutter test test/ui test/util`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/ui/widgets lib/src/util/debouncer.dart test
