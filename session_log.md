@@ -4,6 +4,12 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Theme customization fix verified
+
+- **Theme-application fix confirmed working**, re-reviewed clean. Commit `7380d29` — `fix(sdk): apply the host's PosTheme to pushed SDK routes`. 423/423 tests passing, analyze clean.
+- Every `CashupPosLauncher` method now routes through a new `_wrapPage` helper that applies `CashupPos.config.theme.toThemeData(Theme.of(context).brightness)` via a real `Theme` ancestor — a host's custom `PosConfig(theme: ...)` genuinely reaches every SDK page now, not just in theory. Verified with a test using a distinct color proven to propagate exactly (not coincidentally) via `ColorScheme.fromSeed`'s explicit `primary` override.
+- Task 18 (search field, quantity stepper, numeric keypad, dialogs, sheets, date range, status badge) started in parallel with this re-review — no file overlap.
+
 ## 2026-09-24 (continued) — Task 17 complete; theme-application gap found and being fixed
 
 - **Task 17 (widget library — layout/async foundations) done**, reviewed clean, approved. Commit `8a93e40` — `feat(ui): shared layout, async-state and amount widgets`. 422/422 tests passing, analyze clean. All 14 shared widgets are `const`-constructible, zero unnecessary `StatefulWidget`s; `AsyncView`'s no-rebuild-on-loading-toggle claim was independently verified against Riverpod's actual `AsyncValue.when(skipLoadingOnRefresh: true)` default.
