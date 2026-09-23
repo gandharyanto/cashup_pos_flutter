@@ -18,6 +18,16 @@ class StockMovementPage extends ConsumerStatefulWidget {
   ConsumerState<StockMovementPage> createState() => _StockMovementPageState();
 }
 
+/// The `pos/stock/update` write endpoint only recognizes these two values —
+/// they are distinct from [StockMovementRow.typeIn]/[StockMovementRow.typeOut]
+/// (`'IN'`/`'OUT'`), which belong to the read-only history feed
+/// (`pos/stock-movement/product/list`'s `movementType`). Sending `'IN'`/`'OUT'`
+/// to the write endpoint is silently ignored by the backend. Mirrors the
+/// Kotlin source (`ProductEditFragment.kt`), spelling included —
+/// `"SUBSTRACT"`, not `"SUBTRACT"`.
+String _stockWriteUpdateType(String direction) =>
+    direction == StockMovementRow.typeIn ? 'ADD' : 'SUBSTRACT';
+
 class _StockMovementPageState extends ConsumerState<StockMovementPage> {
   late DateTime _start;
   late DateTime _end;
@@ -107,55 +117,75 @@ class _StockMovementPageState extends ConsumerState<StockMovementPage> {
   );
 
   Future<void> _openUpdate() async {
-    final qty = TextEditingController();
-    var type = StockMovementRow.typeIn;
-    final confirmed = await showDialog<bool>(
+    final update = await showDialog<({int amount, String type})>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Perbarui stok'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'IN', label: Text('Stok masuk')),
-                  ButtonSegment(value: 'OUT', label: Text('Stok keluar')),
-                ],
-                selected: {type},
-                onSelectionChanged: (value) =>
-                    setDialogState(() => type = value.single),
-              ),
-              TextField(
-                controller: qty,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Jumlah'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Batal'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Simpan'),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) => const _StockUpdateDialog(),
     );
-    final amount = int.tryParse(qty.text.trim());
-    qty.dispose();
-    if (confirmed != true || amount == null || amount <= 0) return;
+    if (update == null) return;
     await ref
         .read(posRepositoryProvider)
         .stockUpdate(
           productId: widget.product.id,
-          qty: amount,
-          updateType: type,
+          qty: update.amount,
+          updateType: _stockWriteUpdateType(update.type),
         );
     await _load();
   }
+}
+
+class _StockUpdateDialog extends StatefulWidget {
+  const _StockUpdateDialog();
+
+  @override
+  State<_StockUpdateDialog> createState() => _StockUpdateDialogState();
+}
+
+class _StockUpdateDialogState extends State<_StockUpdateDialog> {
+  final qty = TextEditingController();
+  var type = StockMovementRow.typeIn;
+
+  @override
+  void dispose() {
+    qty.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Perbarui stok'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'IN', label: Text('Stok masuk')),
+            ButtonSegment(value: 'OUT', label: Text('Stok keluar')),
+          ],
+          selected: {type},
+          onSelectionChanged: (value) => setState(() => type = value.single),
+        ),
+        TextField(
+          controller: qty,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Jumlah'),
+        ),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Batal'),
+      ),
+      FilledButton(
+        onPressed: () {
+          final amount = int.tryParse(qty.text.trim());
+          Navigator.pop(
+            context,
+            amount == null || amount <= 0 ? null : (amount: amount, type: type),
+          );
+        },
+        child: const Text('Simpan'),
+      ),
+    ],
+  );
 }

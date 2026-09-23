@@ -21,6 +21,15 @@ Future<QrisStatus?> showQrisPaymentDialog(
   ),
 );
 
+/// Statuses that stop polling. Mirrors the Kotlin source of truth
+/// (`QrisPaymentDialog.kt`, `checkPaymentStatus`): it only calls
+/// `stopStatusChecking()` for the paid branch (`status == "OK" ||
+/// status == "SUCCESS" || code == "0010"`) and the failed branch
+/// (`status == "FAILED" || code == "0020"`); every other status — expired
+/// included — falls through its `when` with a `// Continue checking for
+/// other statuses` comment, i.e. polling keeps going.
+const _terminalStatuses = {QrisStatus.paid, QrisStatus.failed};
+
 class QrisPaymentDialog extends StatefulWidget {
   const QrisPaymentDialog({
     super.key,
@@ -45,6 +54,17 @@ class _QrisPaymentDialogState extends State<QrisPaymentDialog> {
   Timer? timer;
   bool polling = false;
 
+  /// Set synchronously the instant the user cancels — before
+  /// `Navigator.pop` runs — so it is true for the remainder of this
+  /// object's life. Every async continuation that could touch
+  /// `Navigator`/`setState` (the tail of `_generate` and `_poll`) checks
+  /// this first, not just `mounted`: `mounted` stays true for as long as
+  /// the dialog's exit transition is still animating, which is exactly the
+  /// window where a `checkStatus()` call already in flight can resolve and
+  /// try to pop a second time — popping whatever route now sits on top
+  /// since the QRIS route is already gone. `_closed` closes that window.
+  bool _closed = false;
+
   @override
   void initState() {
     super.initState();
@@ -57,15 +77,22 @@ class _QrisPaymentDialogState extends State<QrisPaymentDialog> {
         amount: widget.amount,
         merchantTrxId: widget.merchantTrxId,
       );
-      if (!mounted) return;
+      if (_closed || !mounted) return;
       setState(() => payload = generated);
+      // Kotlin fires the first status check immediately once the QR is
+      // shown (`handleQRGenerated` -> `startStatusChecking`, which posts
+      // its `Runnable` right away), then every `pollInterval` after that.
+      // Fire-and-forget: `_poll` guards itself with `_closed`/`mounted`.
+      unawaited(_poll());
       timer = Timer.periodic(widget.pollInterval, (_) => _poll());
     } catch (caught) {
-      if (mounted) setState(() => error = caught);
+      if (_closed || !mounted) return;
+      setState(() => error = caught);
     }
   }
 
   Future<void> _poll() async {
+    if (_closed) return;
     final current = payload;
     if (current == null || polling) return;
     polling = true;
@@ -74,15 +101,24 @@ class _QrisPaymentDialogState extends State<QrisPaymentDialog> {
         invoiceNumber: current.invoiceNumber,
         merchantTrxId: widget.merchantTrxId,
       );
-      if (!mounted) return;
+      // Re-check after the await: cancel may have happened while this
+      // call was in flight. Discard a stale result rather than act on it.
+      if (_closed || !mounted) return;
       setState(() => status = next);
-      if (next != QrisStatus.pending) {
+      if (_terminalStatuses.contains(next)) {
         timer?.cancel();
+        _closed = true;
         Navigator.pop(context, next);
       }
     } finally {
       polling = false;
     }
+  }
+
+  void _cancel() {
+    timer?.cancel();
+    _closed = true;
+    Navigator.pop(context);
   }
 
   @override
@@ -94,11 +130,11 @@ class _QrisPaymentDialogState extends State<QrisPaymentDialog> {
   @override
   Widget build(BuildContext context) => PosDialog(
     title: 'Pembayaran QRIS',
-    onClose: () => Navigator.pop(context),
+    onClose: _cancel,
     child: SizedBox(
       width: 320,
       child: error != null
-          ? Text('Gagal membuat QR: $error')
+          ? const Text('Gagal membuat QR. Coba lagi.')
           : payload == null
           ? const Center(child: CircularProgressIndicator())
           : Column(

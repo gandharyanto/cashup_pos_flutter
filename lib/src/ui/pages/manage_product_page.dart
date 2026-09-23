@@ -26,6 +26,18 @@ String? validateProductPrice(String? value) {
   return price == null || price < 0 ? 'Harga tidak valid' : null;
 }
 
+String? validateProductSku(String? value) =>
+    value?.trim().isEmpty ?? true ? 'SKU wajib diisi' : null;
+
+String? validateProductUpc(String? value) =>
+    value?.trim().isEmpty ?? true ? 'UPC wajib diisi' : null;
+
+/// Mirrors the Kotlin category picker's validation (`ProductAddFragment.kt`/
+/// `ProductEditFragment.kt`, phone and tablet): at least one category must
+/// be selected before the product can be saved.
+String? validateProductCategories(List<int> categoryIds) =>
+    categoryIds.isEmpty ? 'Pilih minimal satu kategori.' : null;
+
 class ManageProductPage extends ConsumerWidget {
   const ManageProductPage({super.key});
 
@@ -179,10 +191,48 @@ class ManageProductDetailPage extends ConsumerWidget {
                 icon: const Icon(Icons.inventory_2),
                 label: const Text('Kelola stok'),
               ),
+            OutlinedButton.icon(
+              onPressed: () => _delete(context, ref, product),
+              icon: const Icon(Icons.delete),
+              label: const Text('Hapus produk'),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    PosProduct product,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus produk?'),
+        content: Text('Produk “${product.name}” akan dihapus.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(posRepositoryProvider).productDelete(product.id);
+      if (context.mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
+    }
   }
 }
 
@@ -206,6 +256,7 @@ class _ProductEditorPageState extends ConsumerState<ProductEditorPage> {
   late final TextEditingController _qty;
   late final Set<int> _categoryIds;
   bool _saving = false;
+  String? _categoryError;
 
   @override
   void initState() {
@@ -250,10 +301,12 @@ class _ProductEditorPageState extends ConsumerState<ProductEditorPage> {
           TextFormField(
             controller: _sku,
             decoration: const InputDecoration(labelText: 'SKU'),
+            validator: validateProductSku,
           ),
           TextFormField(
             controller: _upc,
             decoration: const InputDecoration(labelText: 'UPC'),
+            validator: validateProductUpc,
           ),
           TextFormField(
             controller: _description,
@@ -279,11 +332,20 @@ class _ProductEditorPageState extends ConsumerState<ProductEditorPage> {
                       selected
                           ? _categoryIds.add(category.id)
                           : _categoryIds.remove(category.id);
+                      _categoryError = null;
                     }),
                   ),
                 )
                 .toList(growable: false),
           ),
+          if (_categoryError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _categoryError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: _saving ? null : _save,
@@ -295,7 +357,12 @@ class _ProductEditorPageState extends ConsumerState<ProductEditorPage> {
   );
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    final categoryError = validateProductCategories(_categoryIds.toList());
+    final isFormValid = _formKey.currentState!.validate();
+    if (categoryError != null) {
+      setState(() => _categoryError = categoryError);
+    }
+    if (!isFormValid || categoryError != null) return;
     setState(() => _saving = true);
     final draft = PosProductDraft(
       name: _name.text.trim(),
