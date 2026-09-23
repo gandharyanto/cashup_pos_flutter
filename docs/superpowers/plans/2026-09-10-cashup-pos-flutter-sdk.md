@@ -2736,7 +2736,7 @@ final cartLineProvider = Provider.family<PosCartLine?, String>((ref, cartKey) =>
 **Cart key format** — must match Kotlin exactly, because it keys per-line savings from the calculator:
 `"$productId" + ("_v" + variantIds.join('-') if any) + ("_m" + sortedModifierIds.join('-') if any) + ("_p" + customBasePrice.toInt() if price-adjustable and overridden)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```dart
 // test/util/cart_key_test.dart
@@ -2820,13 +2820,13 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail** — `flutter test test/state test/util`
+- [x] **Step 2: Run to verify they fail** — `flutter test test/state test/util`
 
-- [ ] **Step 3: Implement `cart_key.dart` and `cart_controller.dart`**
+- [x] **Step 3: Implement `cart_key.dart` and `cart_controller.dart`**
 
-- [ ] **Step 4: Run to verify they pass** — `flutter test test/state test/util`
+- [x] **Step 4: Run to verify they pass** — `flutter test test/state test/util`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/state lib/src/util/cart_key.dart test

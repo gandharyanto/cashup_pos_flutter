@@ -4,6 +4,12 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 21 complete — cart state
+
+- **Task 21 (cart state) done.** Added Kotlin-compatible per-line cart keys, immutable cart state, derived quantities/subtotals, configured-line merging, line-specific Riverpod selection, and the Indonesian finite-stock guard. Adjustable-price overrides participate in keys only for adjustable products; modifier IDs are sorted while variant selection order is preserved.
+- Added focused tests for cart-key parity, same-line merging, separate variant lines, subtotal calculation, finite/unlimited stock behavior, and zero-quantity removal.
+- 479/479 tests passing; `flutter analyze` clean. Next: Task 22 (checkout state with memoised calculation).
+
 ## 2026-09-24 (continued) — Task 20 complete — state layer started
 
 - **Task 20 (catalogue state — first Riverpod task) done**, reviewed clean, approved. Commit `c3fe4b4` — `feat(state): catalogue controller with in-memory filtering`. 471/471 tests passing, analyze clean.
