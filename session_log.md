@@ -4,6 +4,14 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 20 complete — state layer started
+
+- **Task 20 (catalogue state — first Riverpod task) done**, reviewed clean, approved. Commit `c3fe4b4` — `feat(state): catalogue controller with in-memory filtering`. 471/471 tests passing, analyze clean.
+- `lib/src/state/pos_providers.dart` is now the SDK's real provider registry (previously the container was created empty). Design decision: `posConfigProvider` stays `throw UnimplementedError()` as a safety guard, and `CashupPos.initialize()` overrides it with the real `PosConfig` when building each fresh `ProviderContainer` — verified correct across dispose/re-initialize cycles.
+- **In-memory filtering guarantee (rule 8 of the performance budget) proven airtight**: `selectCategory`/`setQuery` were traced and confirmed to make zero repository calls — only the initial `build()` (concurrent `productList`+`categoryList` fetch) and `optionGroups` ever reach the network.
+- `test/data/fake_repository.dart` now implements all 24 `PosRepository` methods (verified signature-for-signature) — it's the shared test double every later state task (cart, checkout, transactions, admin) will reuse.
+- 2 Minor findings deferred, both judgment calls agreed as reasonable (not defects): `refresh()` preserves the current filter/layout across a refetch; `CatalogState` has no `==`/`hashCode` (low risk given the getter-based `visibleProducts` design).
+
 ## 2026-09-24 (continued) — Task 19 complete — widget library finished
 
 - **Task 19 (product tile, cart line, payment method tile, option-group selector, paged list) done**, reviewed clean, approved. Commit `1a8b27e` — `feat(ui): product tile, cart line, option selector and paged list`. 468/468 tests passing, analyze clean.

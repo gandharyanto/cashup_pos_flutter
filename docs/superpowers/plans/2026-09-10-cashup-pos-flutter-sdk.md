@@ -2604,7 +2604,7 @@ final activePromotionsProvider = FutureProvider<List<PromotionItem>>((ref) => ..
 
 **Performance requirement:** `build()` fetches products and categories **once**. `selectCategory` and `setQuery` filter the already-loaded list in memory and never hit the network — that is rule 8 of the budget. `visibleProducts` is computed in the state class, not in a widget `build`.
 
-- [ ] **Step 1: Write the failing controller test**
+- [x] **Step 1: Write the failing controller test**
 
 ```dart
 // test/state/catalog_controller_test.dart
@@ -2658,13 +2658,13 @@ void main() {
 
 Write `test/data/fake_repository.dart` in this step — an in-memory `PosRepository` that counts calls. Later state tasks reuse it.
 
-- [ ] **Step 2: Run to verify it fails** — `flutter test test/state`
+- [x] **Step 2: Run to verify it fails** — `flutter test test/state`
 
-- [ ] **Step 3: Implement the providers and the controller**
+- [x] **Step 3: Implement the providers and the controller**
 
-- [ ] **Step 4: Run to verify it passes** — `flutter test test/state`
+- [x] **Step 4: Run to verify it passes** — `flutter test test/state`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/state test/state test/data
