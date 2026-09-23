@@ -29,7 +29,7 @@ class PosPanel extends StatelessWidget {
         padding: padding ?? const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           children: [
             if (hasHeader)
               Padding(

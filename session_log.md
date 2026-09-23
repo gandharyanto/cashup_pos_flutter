@@ -4,6 +4,12 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 24 complete — product browsing and options
+
+- **Task 24 (`ProductBrowsePage` and `ProductVariantSheet`) done.** The home shell now uses the real virtualized catalogue with debounced search, in-memory category filtering, grid/list switching, stock state, image resolution, and narrowly selected per-product cart quantities.
+- Simple products add directly; variant/modifier products fetch option groups and enforce group selection rules in a `ValueNotifier`-driven sheet; adjustable-price products use the shared numeric keypad before cart insertion.
+- 490/490 tests passing; `flutter analyze` clean. Next: Task 25 (cart page/pane and discount/promotion/reward sheets).
+
 ## 2026-09-24 (continued) — Task 23 complete — responsive POS shell
 
 - **Task 23 (responsive shell and home page) done.** `CashupPosLauncher.open` now pushes the real `PosHomePage` through the existing SDK-owned Riverpod scope and host-configured theme. Phone renders one selling pane plus a pinned cart summary; tablet/wide renders the required 60/40 browse-and-cart panels.

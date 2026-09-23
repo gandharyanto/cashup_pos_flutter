@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cashup_pos/cashup_pos.dart';
+import 'package:cashup_pos/src/ui/widgets/pos_mode_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -29,6 +30,7 @@ void main() {
           theme: customTheme,
         ),
       );
+      CashupPos.container.read(posModeProvider.notifier).state = PosMode.simple;
 
       late BuildContext hostContext;
       await tester.pumpWidget(
@@ -49,7 +51,7 @@ void main() {
       unawaited(CashupPosLauncher.open(hostContext));
       await tester.pumpAndSettle();
 
-      final pushedContext = tester.element(find.text('Pilih produk'));
+      final pushedContext = tester.element(find.text('Simple'));
       final themeOnPushedPage = Theme.of(pushedContext);
 
       expect(

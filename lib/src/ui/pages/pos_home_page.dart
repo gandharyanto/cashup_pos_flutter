@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+export 'product_browse_page.dart' show ProductBrowsePane;
+
 import '../../state/cart_controller.dart';
 import '../../util/responsive.dart';
 import '../widgets/money_text.dart';
 import '../widgets/pos_mode_selector.dart';
 import '../widgets/pos_panel.dart';
 import '../widgets/pos_scaffold.dart';
+import 'product_browse_page.dart';
 
 /// Responsive entry shell shared by the phone and tablet POS experiences.
 class PosHomePage extends ConsumerWidget {
@@ -58,15 +61,6 @@ class PosHomePage extends ConsumerWidget {
       builder: (_) => const SafeArea(child: CartPane()),
     );
   }
-}
-
-/// Task 24 replaces this shell placeholder with the catalogue implementation.
-class ProductBrowsePane extends StatelessWidget {
-  const ProductBrowsePane({super.key});
-
-  @override
-  Widget build(BuildContext context) =>
-      const Center(child: Text('Pilih produk'));
 }
 
 /// Task 25 fills this pane with cart lines, savings, and checkout totals.
