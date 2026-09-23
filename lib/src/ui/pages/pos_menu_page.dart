@@ -6,6 +6,7 @@ import '../widgets/pos_scaffold.dart';
 import 'manage_category_page.dart';
 import 'manage_product_page.dart';
 import 'payment_setting_page.dart';
+import 'simple_amount_page.dart';
 import 'summary_report_page.dart';
 import 'transaction_list_page.dart';
 
@@ -52,6 +53,13 @@ class PosMenuPage extends ConsumerWidget {
             'Pengaturan',
             const PaymentSettingPage(),
           ),
+          if (features.enableSimpleMode)
+            _entry(
+              context,
+              Icons.calculate,
+              'Nominal sederhana',
+              const SimpleAmountPage(),
+            ),
           ListTile(
             leading: const Icon(Icons.sync),
             title: const Text('Segarkan katalog'),

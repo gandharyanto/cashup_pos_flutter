@@ -1,4 +1,5 @@
 import 'package:cashup_pos/src/ui/pages/pos_home_page.dart';
+import 'package:cashup_pos/src/ui/pages/simple_amount_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -13,6 +13,7 @@ import '../widgets/pos_scaffold.dart';
 import 'product_browse_page.dart';
 import 'cart_page.dart';
 import 'pos_menu_page.dart';
+import 'simple_amount_page.dart';
 
 /// Responsive entry shell shared by the phone and tablet POS experiences.
 class PosHomePage extends ConsumerWidget {
@@ -72,15 +73,6 @@ class PosHomePage extends ConsumerWidget {
       builder: (_) => const SafeArea(child: CartPane()),
     );
   }
-}
-
-/// Task 35 replaces this shell placeholder with the amount keypad flow.
-class SimpleAmountPane extends StatelessWidget {
-  const SimpleAmountPane({super.key});
-
-  @override
-  Widget build(BuildContext context) =>
-      const Center(child: Text('Masukkan jumlah'));
 }
 
 /// Phone-only cart affordance pinned below the active selling pane.
