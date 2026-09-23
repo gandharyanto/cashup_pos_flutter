@@ -2879,7 +2879,7 @@ final lineSavingsProvider = Provider.family<double, String>((ref, cartKey) =>
 
 **Memoisation — the core requirement of this task.** `CheckoutController` holds a private `_CalcFingerprint` built from the cart lines, the discount id, the applied promotion ids and their reward selections, the payment setting id, and the payment method. `build()` recomputes only when the fingerprint differs from the previous one. `_CalcFingerprint` implements `==` and `hashCode` over those fields.
 
-- [ ] **Step 1: Write the failing memoisation test**
+- [x] **Step 1: Write the failing memoisation test**
 
 ```dart
 // test/state/checkout_controller_test.dart
@@ -2937,13 +2937,13 @@ void main() {
 
 `TransactionCalculator.debugCalculationCount` is a `static int` incremented at the top of `calculateTransaction`. It exists solely so this test can assert the budget; keep it.
 
-- [ ] **Step 2: Run to verify it fails** — `flutter test test/state`
+- [x] **Step 2: Run to verify it fails** — `flutter test test/state`
 
-- [ ] **Step 3: Implement the mappers and the controller**
+- [x] **Step 3: Implement the mappers and the controller**
 
-- [ ] **Step 4: Run to verify it passes** — `flutter test test/state test/util`
+- [x] **Step 4: Run to verify it passes** — `flutter test test/state test/util`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/state lib/src/util/calc_mappers.dart test

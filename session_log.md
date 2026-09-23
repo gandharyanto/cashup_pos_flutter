@@ -4,6 +4,12 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 22 complete — memoised checkout state
+
+- **Task 22 (checkout state with memoised calculation) done.** Added Kotlin-parity mappers for discounts, promotions, reward selections, schedules, scopes, and cart lines; checkout now calculates totals/savings, applies discounts and reward selections, switches payment methods, and builds transaction payloads.
+- The calculation fingerprint covers cart-line values, discount id, promotion ids and reward selections, payment-setting id, and payment method. Repeated totals reads reuse the cached result; a quantity mutation was proven to invoke `TransactionCalculator` exactly once.
+- 485/485 tests passing; `flutter analyze` clean. Next: Task 23 (responsive shell and home page).
+
 ## 2026-09-24 (continued) — Task 21 complete — cart state
 
 - **Task 21 (cart state) done.** Added Kotlin-compatible per-line cart keys, immutable cart state, derived quantities/subtotals, configured-line merging, line-specific Riverpod selection, and the Indonesian finite-stock guard. Adjustable-price overrides participate in keys only for adjustable products; modifier IDs are sorted while variant selection order is preserved.
