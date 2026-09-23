@@ -4,6 +4,11 @@ Running log of changes made during Claude Code sessions on `cashup_pos_flutter`.
 
 ---
 
+## 2026-09-24 (continued) — Task 27 complete — QRIS dialog
+
+- **Task 27 done.** QR generation, isolated QR repaint boundary, three-second polling, terminal-state shutdown, cancellation cleanup, and failure rendering are implemented and tested.
+- Focused tests and analyzer pass. Next: Task 28 payment orchestration.
+
 ## 2026-09-24 (continued) — Task 26 complete — payment selection and cash
 
 - **Task 26 done.** Added host-capability-filtered payment method groups and the cash dialog with Kotlin-parity four-value predictions, keypad entry, two-decimal change, and guarded confirmation.
