@@ -28,8 +28,12 @@ class PosLookupPage<T> {
     Map<String, dynamic> json,
     T Function(Map<String, dynamic> json) itemFromJson,
   ) {
-    final data = json['data'] as List? ?? const [];
-    final pagination = json['pagination'] as Map<String, dynamic>? ?? const {};
+    final rawData = json['data'];
+    final data = rawData is List ? rawData : const [];
+    final rawPagination = json['pagination'];
+    final pagination = rawPagination is Map
+        ? Map<String, dynamic>.from(rawPagination)
+        : const <String, dynamic>{};
     return PosLookupPage(
       items: data
           .whereType<Map>()

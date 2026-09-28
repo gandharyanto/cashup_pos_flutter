@@ -1,6 +1,7 @@
 import 'package:cashup_pos/src/data/pos_exception.dart';
 import 'package:cashup_pos/src/data/pos_repository_impl.dart';
 import 'package:cashup_pos/src/models/pos_area.dart';
+import 'package:cashup_pos/src/models/pos_lookup_page.dart';
 import 'package:cashup_pos/src/models/pos_merchant_summary.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -253,5 +254,51 @@ void main() {
       expect(merchant.name, 'Kopi Kenangan');
       expect(merchant.areaName, isNull);
     });
+  });
+
+  group('PosLookupPage.fromJson malformed input', () {
+    test('a non-list `data` degrades to an empty items list, not a throw', () {
+      final page = PosLookupPage.fromJson({
+        'success': true,
+        'data': {'unexpected': 'object'}, // object instead of array
+        'pagination': {'page': 1, 'limit': 10, 'hasMore': false},
+      }, PosArea.fromJson);
+
+      expect(page.items, isEmpty);
+      expect(page.page, 1);
+      expect(page.limit, 10);
+      expect(page.hasMore, isFalse);
+    });
+
+    test('a non-map `pagination` degrades to default page/limit/hasMore, not a throw', () {
+      final page = PosLookupPage.fromJson({
+        'success': true,
+        'data': [
+          {'value': 1, 'label': 'Jakarta'},
+        ],
+        'pagination': 'oops', // string instead of object
+      }, PosArea.fromJson);
+
+      expect(page.items.single.id, 1);
+      expect(page.page, 0);
+      expect(page.limit, 1); // falls back to data.length
+      expect(page.hasMore, isFalse);
+    });
+
+    test(
+      'both `data` and `pagination` malformed degrades to an empty page',
+      () {
+        final page = PosLookupPage.fromJson({
+          'success': true,
+          'data': 'not a list either',
+          'pagination': 42,
+        }, PosArea.fromJson);
+
+        expect(page.items, isEmpty);
+        expect(page.page, 0);
+        expect(page.limit, 0);
+        expect(page.hasMore, isFalse);
+      },
+    );
   });
 }
