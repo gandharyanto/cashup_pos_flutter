@@ -1,20 +1,9 @@
-/// The SDK's modal dialog chrome — a titled, optionally closable card used
-/// for confirmations and short forms (e.g. cash payment entry).
-library;
-
 import 'package:flutter/material.dart';
 
-import '../../config/pos_theme.dart';
-
-// `Color`'s wide-gamut fields aren't const-evaluable, so this is a
-// module-level `final`, built once at load — not `const`, and never
-// rebuilt inside `build`.
-final _spacing = const PosTheme.cashup().spacing;
-
-/// A titled dialog card. Show it via Flutter's `showDialog`, passing a
-/// [PosDialog] as the builder's result.
+/// The SDK's standard modal dialog chrome: a title row with an optional
+/// close button, [child] content, and an optional trailing [actions] row —
+/// used with `showDialog(builder: (_) => PosDialog(...))`.
 class PosDialog extends StatelessWidget {
-  /// Creates a POS dialog.
   const PosDialog({
     super.key,
     required this.title,
@@ -24,20 +13,10 @@ class PosDialog extends StatelessWidget {
     this.maxWidth = 420,
   });
 
-  /// The dialog's title.
   final String title;
-
-  /// The dialog's body content.
   final Widget child;
-
-  /// Buttons shown right-aligned below [child]. Omitted entirely when null.
   final List<Widget>? actions;
-
-  /// Shows a close (`x`) button in the header when set.
   final VoidCallback? onClose;
-
-  /// Caps the dialog's width — dialogs stay narrow even on a wide tablet
-  /// screen.
   final double maxWidth;
 
   @override
@@ -48,39 +27,33 @@ class PosDialog extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Padding(
-          padding: EdgeInsets.all(_spacing.l),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: Text(title, style: theme.textTheme.titleLarge),
                   ),
                   if (onClose != null)
                     IconButton(
                       icon: const Icon(Icons.close),
+                      tooltip: 'Tutup',
                       onPressed: onClose,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
                 ],
               ),
-              SizedBox(height: _spacing.m),
-              Flexible(child: child),
-              if (actions != null) ...[
-                SizedBox(height: _spacing.l),
+              const SizedBox(height: 16),
+              child,
+              if (actions != null && actions!.isNotEmpty) ...[
+                const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     for (var i = 0; i < actions!.length; i++) ...[
-                      if (i > 0) SizedBox(width: _spacing.s),
+                      if (i > 0) const SizedBox(width: 8),
                       actions![i],
                     ],
                   ],

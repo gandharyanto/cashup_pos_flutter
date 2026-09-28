@@ -1,23 +1,15 @@
-/// A `- N +` quantity control, used on cart lines, product tiles and the
-/// product-detail sheet.
-library;
-
 import 'package:flutter/material.dart';
 
-import '../../config/pos_theme.dart';
-
-// `Color`'s wide-gamut fields aren't const-evaluable, so this is a
-// module-level `final`, built once at load — not `const`, and never
-// rebuilt inside `build`.
-final _spacing = const PosTheme.cashup().spacing;
-
-/// A quantity stepper: two circular +/- buttons around the current [value].
+/// A decrement/value/increment row for adjusting an integer quantity.
 ///
-/// The decrement button is genuinely disabled (`onPressed: null`) at [min],
-/// and the increment button at [max] — not merely a callback that does
-/// nothing when tapped.
+/// The current quantity lives entirely with the caller — this widget reads
+/// [value] and reports changes through [onChanged]; it holds no state of its
+/// own, so it never needs to reload or resync.
+///
+/// At a bound (`value == min` or `value == max`), the corresponding button's
+/// `onPressed` is `null` rather than a no-op callback — the button is
+/// genuinely disabled (greyed out, not tappable), not merely ignoring taps.
 class QtyStepper extends StatelessWidget {
-  /// Creates a quantity stepper.
   const QtyStepper({
     super.key,
     required this.value,
@@ -28,44 +20,29 @@ class QtyStepper extends StatelessWidget {
     this.onEditRequested,
   });
 
-  /// The current quantity.
   final int value;
-
-  /// Called with the new quantity when a step button is tapped.
   final ValueChanged<int> onChanged;
-
-  /// The lowest quantity the decrement button will reach.
   final int min;
-
-  /// The highest quantity the increment button will reach. Unbounded when
-  /// null.
   final int? max;
 
-  /// Renders smaller buttons for dense rows (e.g. a cart line on phone).
+  /// Smaller buttons/typography for dense contexts such as a cart line.
   final bool compact;
 
-  /// Called when the number itself is tapped, e.g. to open a numeric
-  /// keypad for direct entry. The number is not tappable when this is null.
+  /// Tapping the numeric label invokes this instead of nothing — a page can
+  /// use it to open [showNumericKeypadSheet] for direct entry. `null`
+  /// (default) leaves the label inert.
   final VoidCallback? onEditRequested;
+
+  bool get _canDecrement => value > min;
+  bool get _canIncrement => max == null || value < max!;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final canDecrement = value > min;
-    final canIncrement = max == null || value < max!;
     final buttonSize = compact ? 28.0 : 36.0;
-
-    final numberStyle = theme.textTheme.titleSmall?.copyWith(
-      fontWeight: FontWeight.w600,
-    );
-
-    Widget number = SizedBox(
-      width: compact ? 24 : 32,
-      child: Text('$value', textAlign: TextAlign.center, style: numberStyle),
-    );
-    if (onEditRequested != null) {
-      number = InkWell(onTap: onEditRequested, child: number);
-    }
+    final valueStyle = compact
+        ? theme.textTheme.bodyLarge
+        : theme.textTheme.titleMedium;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -73,22 +50,25 @@ class QtyStepper extends StatelessWidget {
         _StepButton(
           icon: Icons.remove,
           size: buttonSize,
-          onPressed: canDecrement ? () => onChanged(value - 1) : null,
+          onPressed: _canDecrement ? () => onChanged(value - 1) : null,
         ),
-        SizedBox(width: _spacing.s),
-        number,
-        SizedBox(width: _spacing.s),
+        InkWell(
+          onTap: onEditRequested,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
+            child: Text('$value', style: valueStyle),
+          ),
+        ),
         _StepButton(
           icon: Icons.add,
           size: buttonSize,
-          onPressed: canIncrement ? () => onChanged(value + 1) : null,
+          onPressed: _canIncrement ? () => onChanged(value + 1) : null,
         ),
       ],
     );
   }
 }
 
-/// A circular outline button used by [QtyStepper]'s +/- controls.
 class _StepButton extends StatelessWidget {
   const _StepButton({
     required this.icon,
@@ -102,27 +82,13 @@ class _StepButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final enabled = onPressed != null;
-    return SizedBox(
-      width: size,
-      height: size,
+    return SizedBox.square(
+      dimension: size,
       child: IconButton(
-        icon: Icon(icon, size: size * 0.5),
-        onPressed: onPressed,
+        icon: Icon(icon),
+        iconSize: size * 0.6,
         padding: EdgeInsets.zero,
-        style: IconButton.styleFrom(
-          backgroundColor: theme.colorScheme.surface,
-          foregroundColor: enabled
-              ? theme.colorScheme.onSurface
-              : theme.colorScheme.onSurface.withValues(alpha: 0.35),
-          side: BorderSide(
-            color: enabled
-                ? theme.dividerColor
-                : theme.dividerColor.withValues(alpha: 0.5),
-          ),
-          shape: const CircleBorder(),
-        ),
+        onPressed: onPressed,
       ),
     );
   }

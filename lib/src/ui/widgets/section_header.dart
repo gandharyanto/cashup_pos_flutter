@@ -1,22 +1,12 @@
-/// A title/subtitle/trailing-action header, used above a [PosPanel]'s
-/// content or to open a section of a page.
-library;
-
 import 'package:flutter/material.dart';
 
-/// A single-line section heading with an optional subtitle and a trailing
-/// widget (e.g. a "lihat semua" link).
+/// A title (with an optional muted subtitle) and optional trailing widget,
+/// used above a panel or list section.
 class SectionHeader extends StatelessWidget {
-  /// Creates a section header.
   const SectionHeader(this.title, {super.key, this.subtitle, this.trailing});
 
-  /// The heading text.
   final String title;
-
-  /// Optional supporting text below [title].
   final String? subtitle;
-
-  /// Optional trailing widget, aligned to the end of the row.
   final Widget? trailing;
 
   @override
@@ -30,17 +20,15 @@ class SectionHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text(title, style: theme.textTheme.titleMedium),
               if (subtitle != null)
-                Text(
-                  subtitle!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    subtitle!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
             ],

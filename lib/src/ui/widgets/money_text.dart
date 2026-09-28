@@ -1,18 +1,11 @@
-/// A single line of rupiah-formatted text, the shared entry point every
-/// widget that displays a money amount goes through instead of formatting
-/// locally.
-library;
-
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../util/currency.dart';
 
-/// Renders [amount] as rupiah text.
-///
-/// [amount] is treated as a magnitude — [negative] decides the sign shown,
-/// so callers never need to pre-negate their value.
+/// Renders [amount] through [Money.format] / [Money.formatCompact] — the
+/// only way an amount should reach the screen, so every page picks up
+/// rupiah formatting (and any future locale change) for free.
 class MoneyText extends StatelessWidget {
-  /// Creates a money text.
   const MoneyText(
     this.amount, {
     super.key,
@@ -22,29 +15,26 @@ class MoneyText extends StatelessWidget {
     this.negative = false,
   });
 
-  /// The amount to display, as a magnitude (see [negative]).
   final double amount;
-
-  /// Text style override.
   final TextStyle? style;
 
-  /// Uses [Money.formatCompact] (e.g. `'Rp 1,3jt'`) instead of
-  /// [Money.format].
+  /// Use [Money.formatCompact] (`Rp 1,3jt`) instead of the full grouped
+  /// form. Ignores [withSymbol] — the compact form always carries the
+  /// symbol.
   final bool compact;
-
-  /// Whether the `Rp` symbol is included. Ignored when [compact] is true —
-  /// the compact form always carries the symbol.
   final bool withSymbol;
 
-  /// When true, renders [amount] with a leading `-`.
+  /// Force a leading `-` regardless of [amount]'s own sign — used for rows
+  /// that are conceptually a deduction (a discount, a refund) even though
+  /// the underlying amount is stored as a positive magnitude.
   final bool negative;
 
   @override
   Widget build(BuildContext context) {
-    final signed = negative ? -amount.abs() : amount.abs();
+    final signedAmount = negative ? -amount.abs() : amount;
     final text = compact
-        ? Money.formatCompact(signed)
-        : Money.format(signed, withSymbol: withSymbol);
+        ? Money.formatCompact(signedAmount)
+        : Money.format(signedAmount, withSymbol: withSymbol);
     return Text(text, style: style);
   }
 }

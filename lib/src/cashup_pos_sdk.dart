@@ -1,12 +1,13 @@
-/// The package's public entry point: [CashupPos] holds the host's
-/// [PosConfig] and the SDK's own Riverpod container, and
-/// [CashupPosLauncher] pushes SDK screens onto the host's navigator.
+/// The SDK's public entry point: [CashupPos] holds the host's
+/// [PosConfig] and the Riverpod [ProviderContainer] every SDK-internal
+/// widget reads from, and [CashupPosLauncher] is how a host pushes the POS
+/// UI onto its own [Navigator].
 ///
-/// The SDK deliberately owns a private `ProviderContainer` rather than
-/// relying on a `ProviderScope` the host app may or may not have wrapped
-/// itself in — see the "pure online" / seam decisions in `CLAUDE.md`. Every
-/// route the SDK pushes is wrapped in an `UncontrolledProviderScope` bound
-/// to that container, so SDK state never touches the host's Riverpod graph.
+/// Nothing under `state/` or `ui/` exists yet (Tasks 17+), so the launcher
+/// methods below push a placeholder page rather than a real one — see each
+/// method's doc comment. Task 23 replaces `open`'s body with the real
+/// entry page; `openTransactions` / `openProductManagement` /
+/// `openSettings` are replaced by their own later tasks.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,66 +15,96 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/pos_config.dart';
 import 'state/pos_providers.dart';
+import 'ui/pages/manage_product_page.dart';
+import 'ui/pages/payment_setting_page.dart';
+import 'ui/pages/pos_home_page.dart';
+import 'ui/pages/transaction_list_page.dart';
 
-/// Holds the SDK's configuration and its private Riverpod container for the
-/// lifetime of the host's use of the POS.
+/// Owns the SDK's lifecycle: the host's [PosConfig] and the
+/// [ProviderContainer] every SDK screen reads from via
+/// `UncontrolledProviderScope`.
 ///
-/// A host calls [initialize] once (typically at app startup, after it knows
-/// the signed-in user's token), then reads [config] and [container] as
-/// needed, and calls [dispose] when the POS is no longer needed — e.g. on
-/// sign-out.
+/// A host calls [initialize] once (typically in `main()`, before the app
+/// that hosts the POS button is shown) and [dispose] when the SDK is no
+/// longer needed (e.g. on sign-out).
 class CashupPos {
   CashupPos._();
 
   static PosConfig? _config;
   static ProviderContainer? _container;
 
-  /// Initializes the SDK with [config].
-  ///
-  /// Replaces any previous configuration and container — calling this again
-  /// (e.g. after a token refresh that changes [PosConfig.tokenProvider])
-  /// disposes the previous container first.
-  static Future<void> initialize(PosConfig config) async {
-    _container?.dispose();
-    _config = config;
-    _container = ProviderContainer(
-      overrides: [posConfigProvider.overrideWithValue(config)],
-    );
-  }
-
-  /// Whether [initialize] has been called and [dispose] has not since.
+  /// Whether [initialize] has completed and not yet been [dispose]d.
   static bool get isInitialized => _config != null;
 
-  /// The active configuration.
+  /// The active configuration, as passed to [initialize] — with [baseUrl]
+  /// normalised to always carry a trailing slash.
   ///
-  /// Throws a [StateError] if read before [initialize] has completed.
+  /// Throws a [StateError] when read before [initialize].
   static PosConfig get config {
     final config = _config;
     if (config == null) {
       throw StateError(
-        'CashupPos.config was read before CashupPos.initialize() completed.',
+        'CashupPos.initialize() must be called before CashupPos.config is '
+        'read.',
       );
     }
     return config;
   }
 
-  /// The SDK's own Riverpod container, for internal use by SDK state and by
-  /// [CashupPosLauncher] when pushing routes.
+  /// The Riverpod container backing every SDK screen. Internal use only —
+  /// a host never reads providers from this directly; it exists so
+  /// `CashupPosLauncher` can wrap pushed routes in
+  /// `UncontrolledProviderScope(container: CashupPos.container, ...)`.
   ///
-  /// Throws a [StateError] under the same condition as [config].
+  /// Throws a [StateError] when read before [initialize].
   static ProviderContainer get container {
-    if (_container == null) {
+    final container = _container;
+    if (container == null) {
       throw StateError(
-        'CashupPos.container was read before CashupPos.initialize() '
-        'completed.',
+        'CashupPos.initialize() must be called before CashupPos.container '
+        'is read.',
       );
     }
-    return _container!;
+    return container;
   }
 
-  /// Tears down the SDK's container and clears the configuration.
+  /// Stores [config] (normalising [PosConfig.baseUrl]) and creates a fresh
+  /// [ProviderContainer]. Calling this again while already initialized
+  /// disposes the previous container first, so a host that re-initializes
+  /// (e.g. after switching merchant accounts) never leaks the old one.
   ///
-  /// Safe to call whether or not [initialize] was ever called.
+  /// The container overrides `posConfigProvider` with the normalized
+  /// config — every other provider in `pos_providers.dart` derives from it,
+  /// so nothing else needs to be wired here.
+  static Future<void> initialize(PosConfig config) async {
+    _container?.dispose();
+
+    final baseUrl = config.baseUrl.endsWith('/')
+        ? config.baseUrl
+        : '${config.baseUrl}/';
+    final normalized = identical(baseUrl, config.baseUrl)
+        ? config
+        : PosConfig(
+            baseUrl: baseUrl,
+            tokenProvider: config.tokenProvider,
+            merchant: config.merchant,
+            paymentHandler: config.paymentHandler,
+            qrisGateway: config.qrisGateway,
+            theme: config.theme,
+            features: config.features,
+            locale: config.locale,
+            extraHeaders: config.extraHeaders,
+            onTransactionCompleted: config.onTransactionCompleted,
+          );
+
+    _config = normalized;
+    _container = ProviderContainer(
+      overrides: [posConfigProvider.overrideWithValue(normalized)],
+    );
+  }
+
+  /// Disposes the provider container and clears the stored configuration.
+  /// Safe to call whether or not [initialize] ran.
   static Future<void> dispose() async {
     _container?.dispose();
     _container = null;
@@ -81,55 +112,69 @@ class CashupPos {
   }
 }
 
-/// Entry points a host app calls to present SDK screens.
+/// Navigation entry points a host calls to push the POS UI.
 ///
-/// Each method pushes a route wrapped in an `UncontrolledProviderScope`
-/// bound to [CashupPos.container], so the pushed screen sees the SDK's own
-/// provider graph regardless of what (if anything) the host wrapped its own
-/// widget tree in.
+/// Every method wraps its route in
+/// `UncontrolledProviderScope(container: CashupPos.container, child: ...)`
+/// **and** a `Theme` built from `CashupPos.config.theme.toThemeData(...)`
+/// (via [_wrapPage]) so SDK state never touches the host's own Riverpod
+/// graph and every SDK page actually reflects the host's configured
+/// [PosTheme] — not just whatever `Theme.of(context)` the host's app
+/// happens to be using at the push site. Requires [CashupPos.initialize]
+/// to have run first.
+///
+/// **Every future route this SDK pushes (Task 23+ included) must go
+/// through [_wrapPage]** — it is the one place theming is applied, and a
+/// page pushed any other way silently ignores the host's `PosTheme`.
 class CashupPosLauncher {
   CashupPosLauncher._();
 
-  /// Opens the main POS screen (the sales/checkout flow).
+  /// Opens the responsive main POS entry page.
   static Future<void> open(BuildContext context) =>
-      _pushPlaceholder(context, 'POS');
+      _openPage(context, const PosHomePage());
 
-  /// Opens the transaction history/list screen.
+  /// Opens the transaction history / list page.
   static Future<void> openTransactions(BuildContext context) =>
-      _pushPlaceholder(context, 'Riwayat Transaksi');
+      _openPage(context, const TransactionListPage());
 
-  /// Opens product management (catalogue create/edit).
+  /// Opens product and category management.
   static Future<void> openProductManagement(BuildContext context) =>
-      _pushPlaceholder(context, 'Manajemen Produk');
+      _openPage(context, const ManageProductPage());
 
-  /// Opens POS settings.
+  /// Opens POS settings (payment setting, receipt footer, etc).
   static Future<void> openSettings(BuildContext context) =>
-      _pushPlaceholder(context, 'Pengaturan');
+      _openPage(context, const PaymentSettingPage());
 
-  static Future<void> _pushPlaceholder(BuildContext context, String title) {
+  static Future<void> _openPage(BuildContext context, Widget page) {
+    if (!CashupPos.isInitialized) {
+      throw StateError(
+        'CashupPos.initialize() must be called before opening the POS UI.',
+      );
+    }
     return Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => UncontrolledProviderScope(
-          container: CashupPos.container,
-          child: _PlaceholderPage(title: title),
-        ),
-      ),
+      MaterialPageRoute<void>(builder: (_) => _wrapPage(context, page)),
     );
   }
-}
 
-/// Throwaway scaffolding until the real page for each launcher method lands
-/// in a later task (Tasks 23+).
-class _PlaceholderPage extends StatelessWidget {
-  const _PlaceholderPage({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: const Center(child: Text('Belum tersedia')),
+  /// Wraps [child] in the provider scope and theme every SDK-pushed route
+  /// needs. [context] is the pushing context — read synchronously (before
+  /// any `await`), so it is still valid here even though this runs inside
+  /// a `MaterialPageRoute.builder` callback.
+  ///
+  /// Brightness is taken from `Theme.of(context).brightness` — the host
+  /// app's *current* light/dark mode at push time — rather than
+  /// `MediaQuery.platformBrightnessOf(context)` (the OS-level setting).
+  /// This makes the SDK follow whatever light/dark mode the host app is
+  /// actually rendering in, including a host that overrides the platform
+  /// brightness (e.g. a manual in-app theme toggle) rather than diverging
+  /// from it.
+  static Widget _wrapPage(BuildContext context, Widget child) {
+    return UncontrolledProviderScope(
+      container: CashupPos.container,
+      child: Theme(
+        data: CashupPos.config.theme.toThemeData(Theme.of(context).brightness),
+        child: child,
+      ),
     );
   }
 }

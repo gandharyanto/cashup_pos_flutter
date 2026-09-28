@@ -14,4 +14,31 @@ void main() {
     await tester.pump(const Duration(milliseconds: 80));
     expect(calls, [3]);
   });
+
+  testWidgets('cancel prevents a pending action from running', (tester) async {
+    final debouncer = Debouncer(duration: const Duration(milliseconds: 50));
+    addTearDown(debouncer.dispose);
+
+    var ran = false;
+    debouncer.run(() => ran = true);
+    debouncer.cancel();
+
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(ran, isFalse);
+  });
+
+  testWidgets('a new window starts after the previous one fires', (
+    tester,
+  ) async {
+    final debouncer = Debouncer(duration: const Duration(milliseconds: 50));
+    addTearDown(debouncer.dispose);
+
+    final calls = <int>[];
+    debouncer.run(() => calls.add(1));
+    await tester.pump(const Duration(milliseconds: 80));
+    debouncer.run(() => calls.add(2));
+    await tester.pump(const Duration(milliseconds: 80));
+
+    expect(calls, [1, 2]);
+  });
 }

@@ -1,28 +1,25 @@
-/// Infinite-scroll list with a loading / error footer. Backs transactions,
-/// stock movement and product management.
-library;
-
 import 'package:flutter/material.dart';
 
-import '../../config/pos_theme.dart';
+import 'empty_state.dart';
+import 'error_state.dart';
 
-// `Color`'s wide-gamut fields aren't const-evaluable, so this is a
-// module-level `final`, built once at load — not `const`, and never
-// rebuilt inside `build`.
-final _spacing = const PosTheme.cashup().spacing;
-
-/// A default scroll-extent threshold used when the caller supplies no
-/// [PagedListView.itemExtent] to derive one from.
-const double _defaultLoadMoreThreshold = 200;
-
-/// A virtualised, paginated list.
+/// Infinite-scroll list with a loading / error footer. Backs transactions,
+/// stock movement and product management.
 ///
-/// [onLoadMore] is triggered by a [ScrollController] listener once the
-/// viewport nears [ScrollPosition.maxScrollExtent] — never by building a
-/// sentinel/loader item that re-runs load-more logic in [itemBuilder] on
-/// every frame.
+/// This is a [StatefulWidget] because it owns a [ScrollController] — nothing
+/// else. [items], [hasMore] and [isLoadingMore] all stay with the caller;
+/// this widget never mutates or caches them, so a rebuild with a new
+/// [items] list (a fresh page appended, or a pull-to-refresh reset) is
+/// simply rendered as-is.
+///
+/// [onLoadMore] fires from a [ScrollController] listener that compares
+/// [ScrollPosition.pixels] against [ScrollPosition.maxScrollExtent] minus a
+/// fixed threshold — not from a sentinel list item that re-checks on every
+/// build. A sentinel-item check re-runs on every frame the list repaints
+/// (each scroll tick rebuilds `itemBuilder` for the visible range); a
+/// listener only runs when the scroll position actually changes, and does
+/// not itself cause a rebuild.
 class PagedListView<T> extends StatefulWidget {
-  /// Creates a paged list.
   const PagedListView({
     super.key,
     required this.items,
@@ -39,46 +36,33 @@ class PagedListView<T> extends StatefulWidget {
     this.emptyPlaceholder,
   });
 
-  /// The currently loaded items.
   final List<T> items;
-
-  /// Builds the row for one item.
   final Widget Function(BuildContext context, T item, int index) itemBuilder;
 
-  /// Whether another page can be requested.
+  /// Whether a further page exists beyond [items] — controls both whether
+  /// scrolling near the end triggers [onLoadMore] and whether the loading
+  /// footer is eligible to show.
   final bool hasMore;
 
-  /// Called once when the scroll position crosses the load-more threshold.
+  /// Requests the next page. The caller is expected to flip
+  /// [isLoadingMore] (or [hasMore]) in response so this is not re-triggered
+  /// on every subsequent scroll tick while the request is in flight.
   final VoidCallback onLoadMore;
-
-  /// Shows a footer spinner instead of nothing while a page is in flight.
   final bool isLoadingMore;
 
-  /// When set, shows an error footer with a "Coba Lagi" retry button
-  /// instead of the loading footer.
+  /// A page-load failure message. Showing it takes priority over the
+  /// loading footer and suppresses further automatic [onLoadMore] calls
+  /// until [onRetry] is used.
   final String? error;
-
-  /// Called when the retry button in the error footer is tapped.
   final VoidCallback? onRetry;
 
-  /// Fixed row height for a scroll-offset-cheap, `SliverFixedExtentList`-
-  /// backed list; also used to size the load-more threshold. Ignored for
-  /// sliver layout (falls back to natural sizing) when [separator] is also
-  /// set — a separator's height is arbitrary and can't be safely baked into
-  /// a single fixed slot alongside the row without measuring it.
+  /// Fixed row height. When given (and [separator] is not), the list is
+  /// built with `ListView.builder(itemExtent: ...)` — see the class doc
+  /// comment on why a uniform extent matters for scroll performance.
   final double? itemExtent;
-
-  /// Optional separator rendered between rows (not after the last one).
   final Widget? separator;
-
-  /// List padding.
   final EdgeInsetsGeometry? padding;
-
-  /// Enables pull-to-refresh when set.
   final Future<void> Function()? onRefresh;
-
-  /// Shown instead of the list when [items] is empty and there is no
-  /// [error].
   final Widget? emptyPlaceholder;
 
   @override
@@ -86,28 +70,16 @@ class PagedListView<T> extends StatefulWidget {
 }
 
 class _PagedListViewState<T> extends State<PagedListView<T>> {
-  late final ScrollController _controller;
+  final ScrollController _controller = ScrollController();
 
-  // Guards against firing `onLoadMore` on every scroll tick once the
-  // threshold has been crossed — reset when new items arrive or a page
-  // finishes loading, so exactly one request goes out per threshold
-  // crossing.
-  bool _loadMoreTriggered = false;
+  /// How close to the end (in logical pixels) the viewport must scroll
+  /// before [PagedListView.onLoadMore] fires.
+  static const double _loadMoreThreshold = 240;
 
   @override
   void initState() {
     super.initState();
-    _controller = ScrollController()..addListener(_handleScroll);
-  }
-
-  @override
-  void didUpdateWidget(covariant PagedListView<T> oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final itemsChanged = widget.items.length != oldWidget.items.length;
-    final loadingFinished = oldWidget.isLoadingMore && !widget.isLoadingMore;
-    if (itemsChanged || loadingFinished) {
-      _loadMoreTriggered = false;
-    }
+    _controller.addListener(_handleScroll);
   }
 
   @override
@@ -118,144 +90,72 @@ class _PagedListViewState<T> extends State<PagedListView<T>> {
   }
 
   void _handleScroll() {
-    if (!widget.hasMore || widget.isLoadingMore || _loadMoreTriggered) return;
+    if (!widget.hasMore || widget.isLoadingMore || widget.error != null) {
+      return;
+    }
     if (!_controller.hasClients) return;
-
     final position = _controller.position;
-    final threshold = widget.itemExtent != null
-        ? widget.itemExtent! * 3
-        : _defaultLoadMoreThreshold;
-    if (position.pixels >= position.maxScrollExtent - threshold) {
-      _loadMoreTriggered = true;
+    final remaining = position.maxScrollExtent - position.pixels;
+    if (remaining <= _loadMoreThreshold) {
       widget.onLoadMore();
     }
   }
 
-  bool get _hasFooter => widget.error != null || widget.isLoadingMore;
+  bool get _hasFooter => widget.isLoadingMore || widget.error != null;
 
   @override
   Widget build(BuildContext context) {
     if (widget.items.isEmpty && widget.error == null) {
-      return widget.emptyPlaceholder ?? const SizedBox.shrink();
+      return widget.emptyPlaceholder ??
+          const EmptyState(title: 'Tidak ada data');
     }
 
-    final hasFooter = _hasFooter;
-    final hasSeparator = widget.separator != null;
-    // See the [PagedListView.itemExtent] doc: not honoured for sliver
-    // layout once a separator is in play.
-    final fixedExtent = hasSeparator ? null : widget.itemExtent;
+    final itemCount = widget.items.length + (_hasFooter ? 1 : 0);
+    final useFixedExtent =
+        widget.itemExtent != null && widget.separator == null;
 
-    Widget list;
-    if (fixedExtent != null && !hasFooter) {
-      // Fast path: identical to a plain `ListView.builder` — every child is
-      // a uniform-height row with nothing else sharing its slot, so a
-      // single `SliverFixedExtentList` is safe.
-      list = ListView.builder(
-        controller: _controller,
-        padding: widget.padding,
-        itemExtent: fixedExtent,
-        itemCount: widget.items.length,
-        itemBuilder: (context, index) =>
-            widget.itemBuilder(context, widget.items[index], index),
-      );
-    } else {
-      // General path. The footer (natural height: text, a spinner, a retry
-      // button) is a separate sliver appended after the items — never
-      // forced into an item's fixed slot, regardless of whether the items
-      // themselves use a fixed extent.
-      list = CustomScrollView(
-        controller: _controller,
-        slivers: [
-          SliverPadding(
-            padding: widget.padding ?? EdgeInsets.zero,
-            sliver: SliverMainAxisGroup(
-              slivers: [
-                _itemsSliver(fixedExtent, hasSeparator),
-                if (hasFooter)
-                  SliverToBoxAdapter(
-                    child: _Footer(
-                      error: widget.error,
-                      onRetry: widget.onRetry,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
+    final list = useFixedExtent
+        ? ListView.builder(
+            controller: _controller,
+            padding: widget.padding,
+            itemExtent: widget.itemExtent,
+            itemCount: itemCount,
+            itemBuilder: (context, index) => _buildItem(context, index),
+          )
+        : ListView.separated(
+            controller: _controller,
+            padding: widget.padding,
+            itemCount: itemCount,
+            separatorBuilder: (context, index) =>
+                widget.separator ?? const SizedBox.shrink(),
+            itemBuilder: (context, index) => _buildItem(context, index),
+          );
 
     final onRefresh = widget.onRefresh;
-    if (onRefresh != null) {
-      list = RefreshIndicator(onRefresh: onRefresh, child: list);
-    }
-    return list;
+    if (onRefresh == null) return list;
+    return RefreshIndicator(onRefresh: onRefresh, child: list);
   }
 
-  Widget _itemsSliver(double? fixedExtent, bool hasSeparator) {
-    Widget buildRow(BuildContext context, int index) {
-      final row = widget.itemBuilder(context, widget.items[index], index);
-      if (!hasSeparator || index == widget.items.length - 1) return row;
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [row, widget.separator!],
-      );
+  Widget _buildItem(BuildContext context, int index) {
+    if (index < widget.items.length) {
+      return widget.itemBuilder(context, widget.items[index], index);
     }
-
-    if (fixedExtent != null) {
-      return SliverFixedExtentList(
-        itemExtent: fixedExtent,
-        delegate: SliverChildBuilderDelegate(
-          buildRow,
-          childCount: widget.items.length,
-        ),
-      );
+    final error = widget.error;
+    if (error != null) {
+      return ErrorState(message: error, onRetry: widget.onRetry);
     }
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        buildRow,
-        childCount: widget.items.length,
-      ),
-    );
+    return const _LoadingFooter();
   }
 }
 
-/// The list's trailing row: a retry prompt when [error] is set, otherwise a
-/// loading spinner.
-class _Footer extends StatelessWidget {
-  const _Footer({required this.error, required this.onRetry});
-
-  final String? error;
-  final VoidCallback? onRetry;
+class _LoadingFooter extends StatelessWidget {
+  const _LoadingFooter();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final message = error;
-    if (message != null) {
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: _spacing.m),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-            if (onRetry != null) ...[
-              SizedBox(height: _spacing.s),
-              TextButton(onPressed: onRetry, child: const Text('Coba Lagi')),
-            ],
-          ],
-        ),
-      );
-    }
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: _spacing.m),
-      child: const Center(
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 24),
+      child: Center(
         child: SizedBox(
           width: 24,
           height: 24,

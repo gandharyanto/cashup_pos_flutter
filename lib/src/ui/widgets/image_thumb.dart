@@ -1,18 +1,16 @@
-/// A rounded-square product/option thumbnail, the single place an
-/// `Image.network` is constructed for catalogue and cart imagery.
-library;
-
 import 'package:flutter/material.dart';
 
-/// Renders [url] as a thumbnail, always decoded at display size.
+/// A fixed-size product/category photo, or a placeholder icon when [url] is
+/// missing or fails to load.
 ///
-/// [width] and [height] feed `cacheWidth` / `cacheHeight` (scaled by the
-/// device pixel ratio) so a full-resolution product photo never decodes
-/// larger than the pixels it is shown at — rule 4 of the performance
-/// budget. Falls back to a muted placeholder box with [placeholderIcon]
-/// when [url] is null/empty or fails to load.
+/// Always decodes at display size — [width] and [height] (scaled by the
+/// device pixel ratio) feed `cacheWidth` / `cacheHeight` on the underlying
+/// [Image.network], so a full-resolution backend photo is never decoded
+/// larger than the pixels it is actually shown at. This is rule 4 of the
+/// performance budget: a product grid renders dozens of these at once, and
+/// decoding at full resolution there is a real jank source, not a
+/// theoretical one.
 class ImageThumb extends StatelessWidget {
-  /// Creates an image thumbnail.
   const ImageThumb({
     super.key,
     required this.url,
@@ -22,61 +20,54 @@ class ImageThumb extends StatelessWidget {
     this.placeholderIcon,
   });
 
-  /// The image url. Shows the placeholder when null or empty.
   final String? url;
-
-  /// Display width, also used to derive `cacheWidth`.
   final double width;
-
-  /// Display height, also used to derive `cacheHeight`.
   final double height;
-
-  /// Corner radius. Defaults to a 12dp rounded square.
   final BorderRadius? borderRadius;
-
-  /// Icon shown in the placeholder box. Defaults to a generic image icon.
   final IconData? placeholderIcon;
 
   @override
   Widget build(BuildContext context) {
-    final radius = borderRadius ?? BorderRadius.circular(12);
+    final radius = borderRadius ?? BorderRadius.zero;
     final imageUrl = url;
 
     return ClipRRect(
       borderRadius: radius,
-      child: imageUrl == null || imageUrl.isEmpty
-          ? _placeholder(context)
-          : Image.network(
-              imageUrl,
-              width: width,
-              height: height,
-              fit: BoxFit.cover,
-              cacheWidth: _cachePixels(context, width),
-              cacheHeight: _cachePixels(context, height),
-              errorBuilder: (context, error, stackTrace) =>
-                  _placeholder(context),
-            ),
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: imageUrl == null || imageUrl.isEmpty
+            ? _placeholder(context)
+            : _networkImage(context, imageUrl),
+      ),
     );
   }
 
-  int _cachePixels(BuildContext context, double logical) {
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-    return (logical * dpr).round();
+  Widget _networkImage(BuildContext context, String imageUrl) {
+    final devicePixelRatio =
+        MediaQuery.maybeOf(context)?.devicePixelRatio ?? 1.0;
+    final cacheWidth = (width * devicePixelRatio).round();
+    final cacheHeight = (height * devicePixelRatio).round();
+
+    return Image.network(
+      imageUrl,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      cacheWidth: cacheWidth > 0 ? cacheWidth : null,
+      cacheHeight: cacheHeight > 0 ? cacheHeight : null,
+      errorBuilder: (context, error, stackTrace) => _placeholder(context),
+    );
   }
 
   Widget _placeholder(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
-      width: width,
-      height: height,
-      child: ColoredBox(
-        color: theme.colorScheme.surfaceContainerHighest,
-        child: Center(
-          child: Icon(
-            placeholderIcon ?? Icons.image_outlined,
-            size: (width < height ? width : height) * 0.4,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+    return ColoredBox(
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          placeholderIcon ?? Icons.image_outlined,
+          color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
     );

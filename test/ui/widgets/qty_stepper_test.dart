@@ -57,4 +57,41 @@ void main() {
     await tester.pump();
     expect(value, 3);
   });
+
+  testWidgets('the decrement button is disabled at min, not just inert', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: QtyStepper(value: 1, min: 1, onChanged: (_) {})),
+      ),
+    );
+
+    final button = tester.widget<IconButton>(
+      find.ancestor(
+        of: find.byIcon(Icons.remove),
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(button.onPressed, isNull);
+  });
+
+  testWidgets('onEditRequested fires when the label is tapped', (tester) async {
+    var editRequested = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: QtyStepper(
+            value: 4,
+            onChanged: (_) {},
+            onEditRequested: () => editRequested = true,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('4'));
+    await tester.pump();
+    expect(editRequested, isTrue);
+  });
 }

@@ -1,15 +1,19 @@
-/// A pill-shaped search input, debounced so a fast typist doesn't fire a
-/// server search on every keystroke.
-library;
-
 import 'package:flutter/material.dart';
 
 import '../../util/debouncer.dart';
 
-/// A debounced search field. [onChanged] fires [debounce] after typing
-/// pauses, not on every keystroke.
+/// A text field for in-page or server search, debounced so a fast typist
+/// does not fire one request per keystroke.
+///
+/// This is the one widget in this file that is a [StatefulWidget] — it owns
+/// a [TextEditingController] (so it can show/hide the clear button and read
+/// the current text) and a [Debouncer] (so [onChanged] fires once per typing
+/// pause, not once per keystroke). Both are scoped to exactly this widget:
+/// nothing about the current text or debounce timer is lifted any higher.
+/// The clear-button visibility itself is driven by a
+/// [ValueListenableBuilder] on the controller rather than `setState`, so a
+/// keystroke rebuilds only that small suffix icon, not the whole field.
 class SearchField extends StatefulWidget {
-  /// Creates a search field.
   const SearchField({
     super.key,
     required this.onChanged,
@@ -20,23 +24,11 @@ class SearchField extends StatefulWidget {
     this.onSubmitted,
   });
 
-  /// Called with the query text [debounce] after the last keystroke.
   final ValueChanged<String> onChanged;
-
-  /// Placeholder text shown when empty.
   final String? hintText;
-
-  /// Pre-fills the field without triggering [onChanged].
   final String? initialValue;
-
-  /// The debounce window applied to [onChanged].
   final Duration debounce;
-
-  /// Whether the field grabs focus as soon as it is built.
   final bool autofocus;
-
-  /// Called immediately (not debounced) when the field is submitted, e.g.
-  /// via the keyboard's search action.
   final ValueChanged<String>? onSubmitted;
 
   @override
@@ -44,41 +36,49 @@ class SearchField extends StatefulWidget {
 }
 
 class _SearchFieldState extends State<SearchField> {
-  late final TextEditingController _controller;
-  late final Debouncer _debouncer;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-    _debouncer = Debouncer(duration: widget.debounce);
-  }
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialValue,
+  );
+  late final Debouncer _debouncer = Debouncer(duration: widget.debounce);
 
   @override
   void dispose() {
-    _controller.dispose();
     _debouncer.dispose();
+    _controller.dispose();
     super.dispose();
+  }
+
+  void _handleChanged(String value) {
+    _debouncer.run(() => widget.onChanged(value));
+  }
+
+  void _clear() {
+    _debouncer.cancel();
+    _controller.clear();
+    widget.onChanged('');
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return TextField(
       controller: _controller,
       autofocus: widget.autofocus,
       textInputAction: TextInputAction.search,
-      onChanged: (text) => _debouncer.run(() => widget.onChanged(text)),
+      onChanged: _handleChanged,
       onSubmitted: widget.onSubmitted,
       decoration: InputDecoration(
-        hintText: widget.hintText,
+        hintText: widget.hintText ?? 'Cari...',
         prefixIcon: const Icon(Icons.search),
-        filled: true,
-        fillColor: theme.colorScheme.surfaceContainerHighest,
-        contentPadding: const EdgeInsets.symmetric(vertical: 0),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(999),
-          borderSide: BorderSide.none,
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _controller,
+          builder: (context, textValue, _) {
+            if (textValue.text.isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.clear),
+              tooltip: 'Hapus',
+              onPressed: _clear,
+            );
+          },
         ),
       ),
     );

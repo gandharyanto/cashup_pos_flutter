@@ -1,59 +1,49 @@
-/// Breakpoints and form-factor detection for the SDK's responsive layouts.
+/// Screen-width breakpoints and the derived layout metadata every page and
+/// widget in `ui/` reads to decide phone/tablet/wide behaviour (grid column
+/// count, panel arrangement, and so on).
 ///
-/// A single POS screen adapts across phone, tablet and wide/desktop-class
-/// layouts rather than shipping separate widget trees per device class, so
-/// every page reads its target layout through [PosLayout.of] rather than
-/// branching on raw pixel widths itself.
+/// This deliberately depends on [BuildContext] (via [PosLayout.of]), unlike
+/// the rest of `util/` — layout resolution is inherently about the current
+/// [MediaQuery], and every later UI task needs a single, consistent place to
+/// ask "what form factor am I in?" rather than re-deriving breakpoints per
+/// page.
 library;
 
 import 'package:flutter/widgets.dart';
 
-/// The pixel-width thresholds that separate [PosFormFactor]s.
+/// Width thresholds separating [PosFormFactor.phone], [PosFormFactor.tablet]
+/// and [PosFormFactor.wide] layouts.
 class PosBreakpoints {
   PosBreakpoints._();
 
-  /// Width at or above which the layout is [PosFormFactor.tablet].
+  /// Below this width the layout is [PosFormFactor.phone].
   static const double tablet = 720;
 
-  /// Width at or above which the layout is [PosFormFactor.wide].
+  /// At or above this width the layout is [PosFormFactor.wide]; between
+  /// [tablet] and this the layout is [PosFormFactor.tablet].
   static const double wide = 1080;
 }
 
-/// The three layout classes a POS screen adapts to.
-enum PosFormFactor {
-  /// Narrower than [PosBreakpoints.tablet].
-  phone,
+/// The form factors the SDK lays pages out for.
+enum PosFormFactor { phone, tablet, wide }
 
-  /// From [PosBreakpoints.tablet] up to (excluding) [PosBreakpoints.wide].
-  tablet,
-
-  /// [PosBreakpoints.wide] and above.
-  wide,
-}
-
-/// The resolved layout for the current screen size, computed once per
-/// [BuildContext] via [PosLayout.of] and threaded down instead of every
-/// widget re-deriving its own breakpoint checks.
+/// Resolved layout information for the current [BuildContext].
+///
+/// Obtain one via [PosLayout.of] inside `build` — it reads
+/// [MediaQuery.sizeOf], so a widget that calls it only rebuilds when the
+/// screen size actually changes, not on unrelated `MediaQuery` changes
+/// (text scale, padding, brightness, ...).
 class PosLayout {
-  /// Creates a layout from an already-resolved [formFactor] and [size].
   const PosLayout(this.formFactor, this.size);
 
-  /// The resolved form factor.
   final PosFormFactor formFactor;
-
-  /// The screen size this layout was resolved from.
   final Size size;
 
-  /// True when [formFactor] is [PosFormFactor.phone].
   bool get isPhone => formFactor == PosFormFactor.phone;
-
-  /// True when [formFactor] is [PosFormFactor.tablet].
   bool get isTablet => formFactor == PosFormFactor.tablet;
-
-  /// True when [formFactor] is [PosFormFactor.wide].
   bool get isWide => formFactor == PosFormFactor.wide;
 
-  /// The number of columns a product grid should use at this form factor.
+  /// Product grid column count for this form factor.
   int get productGridColumns {
     switch (formFactor) {
       case PosFormFactor.phone:
@@ -65,17 +55,14 @@ class PosLayout {
     }
   }
 
-  /// Resolves the [PosLayout] for the current screen size.
   static PosLayout of(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final PosFormFactor formFactor;
-    if (size.width >= PosBreakpoints.wide) {
-      formFactor = PosFormFactor.wide;
-    } else if (size.width >= PosBreakpoints.tablet) {
-      formFactor = PosFormFactor.tablet;
-    } else {
-      formFactor = PosFormFactor.phone;
-    }
-    return PosLayout(formFactor, size);
+    return PosLayout(_formFactorFor(size.width), size);
+  }
+
+  static PosFormFactor _formFactorFor(double width) {
+    if (width >= PosBreakpoints.wide) return PosFormFactor.wide;
+    if (width >= PosBreakpoints.tablet) return PosFormFactor.tablet;
+    return PosFormFactor.phone;
   }
 }

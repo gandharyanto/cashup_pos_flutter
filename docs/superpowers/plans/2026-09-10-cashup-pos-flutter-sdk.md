@@ -1855,7 +1855,7 @@ class CashupPosLauncher {
 
 Each launcher wraps its route in `UncontrolledProviderScope(container: CashupPos.container, child: ...)` so SDK state never touches the host's Riverpod graph.
 
-- [ ] **Step 1: Write the failing config test**
+- [x] **Step 1: Write the failing config test**
 
 ```dart
 // test/config/pos_config_test.dart
@@ -1892,11 +1892,11 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `flutter test test/config`
+- [x] **Step 2: Run to verify it fails** — `flutter test test/config`
 
-- [ ] **Step 3: Implement config, theme and the SDK entry point**
+- [x] **Step 3: Implement config, theme and the SDK entry point**
 
-- [ ] **Step 4: Export the public surface from `lib/cashup_pos.dart`**
+- [x] **Step 4: Export the public surface from `lib/cashup_pos.dart`**
 
 ```dart
 library cashup_pos;
@@ -1912,9 +1912,9 @@ export 'src/data/pos_repository.dart' show PosRepository;
 export 'src/models/transaction_details.dart' show TransactionDetails;
 ```
 
-- [ ] **Step 5: Run to verify it passes** — `flutter test` (whole suite)
+- [x] **Step 5: Run to verify it passes** — `flutter test` (whole suite)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib test
@@ -2012,7 +2012,7 @@ class TotalsPanel extends StatelessWidget {
 
 **Performance requirements for this task:** every widget here has a `const` constructor. `AsyncView` must not rebuild its data subtree when only the loading flag toggles — build the data branch from the `AsyncValue` directly rather than through a `StatefulWidget`.
 
-- [ ] **Step 1: Write the failing widget tests**
+- [x] **Step 1: Write the failing widget tests**
 
 ```dart
 // test/ui/widgets/async_view_test.dart
@@ -2095,13 +2095,13 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail** — `flutter test test/ui`
+- [x] **Step 2: Run to verify they fail** — `flutter test test/ui`
 
-- [ ] **Step 3: Implement `responsive.dart` and the eleven widgets**
+- [x] **Step 3: Implement `responsive.dart` and the eleven widgets**
 
-- [ ] **Step 4: Run to verify they pass** — `flutter test test/ui`
+- [x] **Step 4: Run to verify they pass** — `flutter test test/ui`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/ui/widgets lib/src/util/responsive.dart test/ui
@@ -2192,7 +2192,7 @@ class StatusBadge extends StatelessWidget {
 }
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```dart
 // test/ui/widgets/qty_stepper_test.dart
@@ -2320,15 +2320,15 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail** — `flutter test test/ui test/util`
+- [x] **Step 2: Run to verify they fail** — `flutter test test/ui test/util`
 
-- [ ] **Step 3: Implement the helpers and widgets**
+- [x] **Step 3: Implement the helpers and widgets**
 
 `NumericKeypad` builds its twelve buttons once as `const` children and wraps only the caller's amount display in a `ValueListenableBuilder`. That is the point of taking a `ValueNotifier` rather than a `String` plus callback.
 
-- [ ] **Step 4: Run to verify they pass** — `flutter test test/ui test/util`
+- [x] **Step 4: Run to verify they pass** — `flutter test test/ui test/util`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/ui/widgets lib/src/util/debouncer.dart test
@@ -2420,7 +2420,7 @@ class PagedListView<T> extends StatefulWidget {
 
 **Performance requirements for this task:** `PosProductTile` is wrapped in a `RepaintBoundary` at its root. `PagedListView` uses `ListView.builder` with `itemExtent` when the caller supplies one, and triggers `onLoadMore` from a scroll extent threshold rather than by building a sentinel item on every frame.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```dart
 // test/util/image_url_test.dart
@@ -2549,13 +2549,13 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail** — `flutter test test/ui test/util`
+- [x] **Step 2: Run to verify they fail** — `flutter test test/ui test/util`
 
-- [ ] **Step 3: Implement the helper and the eight widgets**
+- [x] **Step 3: Implement the helper and the eight widgets**
 
-- [ ] **Step 4: Run to verify they pass** — `flutter test`
+- [x] **Step 4: Run to verify they pass** — `flutter test`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/ui/widgets lib/src/util/image_url.dart test
@@ -2604,7 +2604,7 @@ final activePromotionsProvider = FutureProvider<List<PromotionItem>>((ref) => ..
 
 **Performance requirement:** `build()` fetches products and categories **once**. `selectCategory` and `setQuery` filter the already-loaded list in memory and never hit the network — that is rule 8 of the budget. `visibleProducts` is computed in the state class, not in a widget `build`.
 
-- [ ] **Step 1: Write the failing controller test**
+- [x] **Step 1: Write the failing controller test**
 
 ```dart
 // test/state/catalog_controller_test.dart
@@ -2658,13 +2658,13 @@ void main() {
 
 Write `test/data/fake_repository.dart` in this step — an in-memory `PosRepository` that counts calls. Later state tasks reuse it.
 
-- [ ] **Step 2: Run to verify it fails** — `flutter test test/state`
+- [x] **Step 2: Run to verify it fails** — `flutter test test/state`
 
-- [ ] **Step 3: Implement the providers and the controller**
+- [x] **Step 3: Implement the providers and the controller**
 
-- [ ] **Step 4: Run to verify it passes** — `flutter test test/state`
+- [x] **Step 4: Run to verify it passes** — `flutter test test/state`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/state test/state test/data
@@ -2736,7 +2736,7 @@ final cartLineProvider = Provider.family<PosCartLine?, String>((ref, cartKey) =>
 **Cart key format** — must match Kotlin exactly, because it keys per-line savings from the calculator:
 `"$productId" + ("_v" + variantIds.join('-') if any) + ("_m" + sortedModifierIds.join('-') if any) + ("_p" + customBasePrice.toInt() if price-adjustable and overridden)`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```dart
 // test/util/cart_key_test.dart
@@ -2820,13 +2820,13 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail** — `flutter test test/state test/util`
+- [x] **Step 2: Run to verify they fail** — `flutter test test/state test/util`
 
-- [ ] **Step 3: Implement `cart_key.dart` and `cart_controller.dart`**
+- [x] **Step 3: Implement `cart_key.dart` and `cart_controller.dart`**
 
-- [ ] **Step 4: Run to verify they pass** — `flutter test test/state test/util`
+- [x] **Step 4: Run to verify they pass** — `flutter test test/state test/util`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/state lib/src/util/cart_key.dart test
@@ -2879,7 +2879,7 @@ final lineSavingsProvider = Provider.family<double, String>((ref, cartKey) =>
 
 **Memoisation — the core requirement of this task.** `CheckoutController` holds a private `_CalcFingerprint` built from the cart lines, the discount id, the applied promotion ids and their reward selections, the payment setting id, and the payment method. `build()` recomputes only when the fingerprint differs from the previous one. `_CalcFingerprint` implements `==` and `hashCode` over those fields.
 
-- [ ] **Step 1: Write the failing memoisation test**
+- [x] **Step 1: Write the failing memoisation test**
 
 ```dart
 // test/state/checkout_controller_test.dart
@@ -2937,13 +2937,13 @@ void main() {
 
 `TransactionCalculator.debugCalculationCount` is a `static int` incremented at the top of `calculateTransaction`. It exists solely so this test can assert the budget; keep it.
 
-- [ ] **Step 2: Run to verify it fails** — `flutter test test/state`
+- [x] **Step 2: Run to verify it fails** — `flutter test test/state`
 
-- [ ] **Step 3: Implement the mappers and the controller**
+- [x] **Step 3: Implement the mappers and the controller**
 
-- [ ] **Step 4: Run to verify it passes** — `flutter test test/state test/util`
+- [x] **Step 4: Run to verify it passes** — `flutter test test/state test/util`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/state lib/src/util/calc_mappers.dart test
@@ -2973,7 +2973,7 @@ git commit -m "feat(state): checkout controller with memoised transaction calcul
 - `PosFormFactor.tablet` / `.wide` — `Row` with the browse pane at flex 6 and the cart pane at flex 4, both inside `PosPanel`, mirroring the Kotlin weights.
 - The mode selector sits in the app bar in both cases; `PosMode.simple` swaps the browse pane for `SimpleAmountPage`.
 
-- [ ] **Step 1: Write the failing layout test**
+- [x] **Step 1: Write the failing layout test**
 
 ```dart
 // test/ui/pages/pos_home_page_test.dart
@@ -3019,13 +3019,13 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails** — `flutter test test/ui/pages`
+- [x] **Step 2: Run to verify it fails** — `flutter test test/ui/pages`
 
-- [ ] **Step 3: Implement the shell**
+- [x] **Step 3: Implement the shell**
 
-- [ ] **Step 4: Run to verify it passes** — `flutter test test/ui`
+- [x] **Step 4: Run to verify it passes** — `flutter test test/ui`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/src/ui test
@@ -3040,17 +3040,17 @@ Each screen task follows the same five-step shape as Task 23 — write the widge
 
 | Task | Page(s) | Kotlin source | Key behaviours the test must pin |
 |---|---|---|---|
-| 24 | `ProductBrowsePage`, `ProductVariantSheet` | `PosProductFragment`, `TabletProductsFragment`, `PosProductVariantBottomSheet` | grid/list toggle; category chips filter without refetch; debounced search; a product with option groups opens the sheet instead of adding directly; price-adjustable products prompt for a price via the keypad sheet |
-| 25 | `CartPage`, `CartPane`, `DiscountPickerSheet`, `PromotionPickerSheet`, `RewardSelectorSheet` | `ProductCartActivity` (1 313 lines), `TabletCartFragment` (1 532 lines) | per-line savings badge; ineligible discounts greyed out via `isDiscountEligible`; reward selection feeds `selectedRewardQtyMap`; totals panel shows subtotal, discount, promo, service charge, tax, rounding, total |
-| 26 | `PaymentMethodPage`, `CashPaymentDialog` | `ListPaymentActivity` (1 370 lines), `CashPaymentDialog` | internal/external method groups; methods the host cannot handle are hidden; cash quick-amount predictions (exact, next 1k, 5k, 10k, 50k, then denominations, always four); confirm disabled until tendered ≥ total; change computed to 2 dp |
-| 27 | `QrisPaymentDialog` | `QrisPaymentDialog` (448 lines) | QR renders from `QrisGateway.generate`; polls `checkStatus` every 3 s; stops polling on paid/failed; cancel stops polling and reports cancellation; the QR image sits in a `RepaintBoundary` so the status label repaint does not touch it |
-| 28 | payment orchestration, `PaymentResultPage` | `ListPaymentActivity` + `ResultActivity` | cash completes locally then posts; card/CDCP delegates to `PosPaymentHandler` and posts on success; a lost `create` response shows a retry prompt rather than auto-retrying; success clears the cart and routes to the receipt |
-| 29 | `ReceiptView`, `ReceiptPage` | `ReceiptTemplate.kt` (923 lines), `PosTransactionReceiptActivity` | section order: header, code, date, items (qty badge, name, line total, unit price when qty > 1, variant then modifier bullets), notes box, discount, promo, subtotal, service charge with percentage, tax, rounding, TOTAL, payment info, cash tendered, change, queue number, footer; 58 mm and 80 mm widths |
-| 30 | `TransactionListPage`, `TransactionDetailPage` | `TransactionActivity`, `TransactionDetailActivity` | date-range filter; paged 20 at a time via `PagedListView`; status badges; detail shows items with variant/modifier summaries and the same `TotalsPanel` as the cart |
-| 31 | `ManageProductPage` (list/add/edit/detail), `StockMovementPage` | `ManageProductActivity` + fragments, `StockMovementActivity` | create/update validation; category multi-select; stock update with movement type; movement history paged by date range |
-| 32 | `ManageCategoryPage` (list/add/edit/detail) | `ManageCategoryActivity` + fragments | create/update/delete with confirmation; deleting a category in use surfaces the backend message |
-| 33 | `PaymentSettingPage`, `ReceiptConfigPage` | `PaymentSettingActivity`, `PosReceiptConfigActivity` | rounding target/type, service charge percentage vs amount (mutually exclusive), tax name and percentage, price-include-tax; missing settings offer to create defaults; receipt header/footer text |
-| 34 | `SummaryReportPage`, `PosMenuPage` | `PosSummaryReportActivity`, `TabletMenuActivity` | product sales and payment breakdown over a date range; menu gates entries on `PosFeatureFlags`; menu carries the catalogue refresh action that replaces `SyncActivity` |
+| 24 ✅ | `ProductBrowsePage`, `ProductVariantSheet` | `PosProductFragment`, `TabletProductsFragment`, `PosProductVariantBottomSheet` | grid/list toggle; category chips filter without refetch; debounced search; a product with option groups opens the sheet instead of adding directly; price-adjustable products prompt for a price via the keypad sheet |
+| 25 ✅ | `CartPage`, `CartPane`, `DiscountPickerSheet`, `PromotionPickerSheet`, `RewardSelectorSheet` | `ProductCartActivity` (1 313 lines), `TabletCartFragment` (1 532 lines) | per-line savings badge; ineligible discounts greyed out via `isDiscountEligible`; reward selection feeds `selectedRewardQtyMap`; totals panel shows subtotal, discount, promo, service charge, tax, rounding, total |
+| 26 ✅ | `PaymentMethodPage`, `CashPaymentDialog` | `ListPaymentActivity` (1 370 lines), `CashPaymentDialog` | internal/external method groups; methods the host cannot handle are hidden; cash quick-amount predictions (exact, next 1k, 5k, 10k, 50k, then denominations, always four); confirm disabled until tendered ≥ total; change computed to 2 dp |
+| 27 ✅ | `QrisPaymentDialog` | `QrisPaymentDialog` (448 lines) | QR renders from `QrisGateway.generate`; polls `checkStatus` every 3 s; stops polling on paid/failed; cancel stops polling and reports cancellation; the QR image sits in a `RepaintBoundary` so the status label repaint does not touch it |
+| 28 ✅ | payment orchestration, `PaymentResultPage` | `ListPaymentActivity` + `ResultActivity` | cash completes locally then posts; card/CDCP delegates to `PosPaymentHandler` and posts on success; a lost `create` response shows a retry prompt rather than auto-retrying; success clears the cart and routes to the receipt |
+| 29 ✅ | `ReceiptView`, `ReceiptPage` | `ReceiptTemplate.kt` (923 lines), `PosTransactionReceiptActivity` | section order: header, code, date, items (qty badge, name, line total, unit price when qty > 1, variant then modifier bullets), notes box, discount, promo, subtotal, service charge with percentage, tax, rounding, TOTAL, payment info, cash tendered, change, queue number, footer; 58 mm and 80 mm widths |
+| 30 ✅ | `TransactionListPage`, `TransactionDetailPage` | `TransactionActivity`, `TransactionDetailActivity` | date-range filter; paged 20 at a time via `PagedListView`; status badges; detail shows items with variant/modifier summaries and the same `TotalsPanel` as the cart |
+| 31 ✅ | `ManageProductPage` (list/add/edit/detail), `StockMovementPage` | `ManageProductActivity` + fragments, `StockMovementActivity` | create/update validation; category multi-select; stock update with movement type; movement history paged by date range |
+| 32 ✅ | `ManageCategoryPage` (list/add/edit/detail) | `ManageCategoryActivity` + fragments | create/update/delete with confirmation; deleting a category in use surfaces the backend message |
+| 33 ✅ | `PaymentSettingPage`, `ReceiptConfigPage` | `PaymentSettingActivity`, `PosReceiptConfigActivity` | rounding target/type, service charge percentage vs amount (mutually exclusive), tax name and percentage, price-include-tax; missing settings offer to create defaults; receipt header/footer text |
+| 34 ✅ | `SummaryReportPage`, `PosMenuPage` | `PosSummaryReportActivity`, `TabletMenuActivity` | product sales and payment breakdown over a date range; menu gates entries on `PosFeatureFlags`; menu carries the catalogue refresh action that replaces `SyncActivity` |
 | 35 | `SimpleAmountPage` | `CalculatorActivity`, `PosAmountFragment` | keypad-driven amount; charge routes into the same payment flow with a single synthetic line; no catalogue required |
 
 ---

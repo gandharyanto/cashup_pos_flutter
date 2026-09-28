@@ -1,32 +1,25 @@
-/// A single product card in the browse grid/list, used by both the phone
-/// and tablet catalogue pages.
-library;
-
 import 'package:flutter/material.dart';
 
-import '../../config/pos_theme.dart';
 import 'image_thumb.dart';
 import 'money_text.dart';
 
-// `Color`'s wide-gamut fields aren't const-evaluable, so this is a
-// module-level `final`, built once at load — not `const`, and never
-// rebuilt inside `build`.
-final _spacing = const PosTheme.cashup().spacing;
+/// Which shape [PosProductTile] renders itself as: a square-image grid cell
+/// for the browse grid, or a compact row for admin/search lists.
+enum ProductTileLayout { grid, list }
 
-/// How [PosProductTile] arranges its image, name and price.
-enum ProductTileLayout {
-  /// A square-ish card for a grid of products.
-  grid,
-
-  /// A wide row for a dense product list.
-  list,
-}
-
-/// A product card. Takes primitives, not a `PosProduct`, so product
-/// management and the browse grid can both use it without either owning
-/// the other's model.
+/// A single product's tile, used by the browse grid and by product
+/// management (list and grid views alike).
+///
+/// Takes primitives (`name`, `price`, ...), not a `PosProduct`, so product
+/// management and the browse grid can both use it without either owning the
+/// other's model.
+///
+/// A browse grid renders dozens of these at once, and every tile is wrapped
+/// in a [RepaintBoundary] at the root of [build] — see the citation in the
+/// class body — so panning the grid, or a badge changing on one tile (e.g.
+/// [quantityInCart] ticking up after an add-to-cart), never forces its
+/// neighbours to repaint.
 class PosProductTile extends StatelessWidget {
-  /// Creates a product tile.
   const PosProductTile({
     super.key,
     required this.name,
@@ -43,71 +36,92 @@ class PosProductTile extends StatelessWidget {
     this.trailing,
   });
 
-  /// The product name.
   final String name;
-
-  /// The unit price.
   final double price;
-
-  /// Grid card vs. list row arrangement.
   final ProductTileLayout layout;
-
-  /// The product's image url, already resolved (see `resolveImageUrl`).
   final String? imageUrl;
-
-  /// Optional SKU, shown as small secondary text.
   final String? sku;
-
-  /// Optional stock caption, e.g. `'Sisa 4'`. Ignored when [outOfStock].
   final String? stockLabel;
-
-  /// When true, shows `'Stok habis'` in place of [stockLabel] and disables
-  /// [onTap] / [onLongPress].
   final bool outOfStock;
-
-  /// Optional small corner badge, e.g. a promo tag such as `'-31%'`.
   final String? badgeLabel;
-
-  /// Quantity of this product already in the cart. Renders a small numbered
-  /// badge when greater than zero.
   final int quantityInCart;
-
-  /// Called when the tile is tapped. Ignored when [outOfStock].
   final VoidCallback? onTap;
-
-  /// Called on long-press. Ignored when [outOfStock].
   final VoidCallback? onLongPress;
+  final Widget? trailing;
 
-  /// Optional trailing widget, e.g. an "add" affordance.
+  static const double _listThumbSize = 56;
+  static const double _gridImageHeight = 120;
+  static const double _quantityBadgeSize = 22;
+  static const double _gridCornerRadius = 12;
+
+  @override
+  Widget build(BuildContext context) {
+    // RepaintBoundary is the outermost widget this build() returns — see
+    // the class doc comment. Everything below it (image decode, the
+    // in-cart quantity badge, the InkWell ripple) repaints inside this
+    // tile's own layer without touching siblings in the grid.
+    return RepaintBoundary(
+      child: _PosProductTileBody(
+        name: name,
+        price: price,
+        layout: layout,
+        imageUrl: imageUrl,
+        sku: sku,
+        stockLabel: stockLabel,
+        outOfStock: outOfStock,
+        badgeLabel: badgeLabel,
+        quantityInCart: quantityInCart,
+        onTap: onTap,
+        onLongPress: onLongPress,
+        trailing: trailing,
+      ),
+    );
+  }
+}
+
+class _PosProductTileBody extends StatelessWidget {
+  const _PosProductTileBody({
+    required this.name,
+    required this.price,
+    required this.layout,
+    required this.imageUrl,
+    required this.sku,
+    required this.stockLabel,
+    required this.outOfStock,
+    required this.badgeLabel,
+    required this.quantityInCart,
+    required this.onTap,
+    required this.onLongPress,
+    required this.trailing,
+  });
+
+  final String name;
+  final double price;
+  final ProductTileLayout layout;
+  final String? imageUrl;
+  final String? sku;
+  final String? stockLabel;
+  final bool outOfStock;
+  final String? badgeLabel;
+  final int quantityInCart;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final radius = BorderRadius.circular(12);
+    final tappable = !outOfStock;
 
-    return RepaintBoundary(
-      child: Opacity(
-        opacity: outOfStock ? 0.55 : 1,
-        child: Material(
-          color: theme.colorScheme.surface,
-          borderRadius: radius,
-          child: InkWell(
-            borderRadius: radius,
-            onTap: outOfStock ? null : onTap,
-            onLongPress: outOfStock ? null : onLongPress,
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: theme.dividerColor),
-                borderRadius: radius,
-              ),
-              padding: EdgeInsets.all(_spacing.s),
-              child: layout == ProductTileLayout.grid
-                  ? _buildGrid(context, theme)
-                  : _buildList(context, theme),
-            ),
-          ),
-        ),
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: tappable ? onTap : null,
+        onLongPress: tappable ? onLongPress : null,
+        child: layout == ProductTileLayout.grid
+            ? _buildGrid(context, theme)
+            : _buildList(context, theme),
       ),
     );
   }
@@ -117,142 +131,159 @@ class PosProductTile extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _thumb(context, size: 96),
-        SizedBox(height: _spacing.s),
-        _name(theme),
-        if (sku != null) _sku(theme),
-        SizedBox(height: _spacing.xs),
-        _price(theme),
-        _stockCaption(theme),
-        if (trailing != null) ...[SizedBox(height: _spacing.s), trailing!],
+        Stack(
+          children: [
+            // The image fills the tile's available width (set by the
+            // caller's grid cell) at a fixed height, rather than a square
+            // tied to width — a tile dropped into an unbounded-height
+            // parent (as in a couple of these widget tests) would otherwise
+            // blow past the available height and overflow.
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return ImageThumb(
+                  url: imageUrl,
+                  width: constraints.maxWidth,
+                  height: PosProductTile._gridImageHeight,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(PosProductTile._gridCornerRadius),
+                  ),
+                );
+              },
+            ),
+            if (badgeLabel != null)
+              Positioned(
+                left: 6,
+                top: 6,
+                child: _Pill(
+                  label: badgeLabel!,
+                  background: theme.colorScheme.secondary,
+                  foreground: theme.colorScheme.onSecondary,
+                ),
+              ),
+            if (quantityInCart > 0)
+              Positioned(
+                right: 6,
+                top: 6,
+                child: _QuantityBadge(quantity: quantityInCart),
+              ),
+            if (outOfStock) const Positioned.fill(child: _OutOfStockOverlay()),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+          child: _details(theme, priceStyle: theme.textTheme.titleSmall),
+        ),
       ],
     );
   }
 
   Widget _buildList(BuildContext context, ThemeData theme) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _thumb(context, size: 64),
-        SizedBox(width: _spacing.m),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        children: [
+          Stack(
             children: [
-              _name(theme),
-              if (sku != null) _sku(theme),
-              SizedBox(height: _spacing.xs),
-              _price(theme),
-              _stockCaption(theme),
+              ImageThumb(
+                url: imageUrl,
+                width: PosProductTile._listThumbSize,
+                height: PosProductTile._listThumbSize,
+                borderRadius: BorderRadius.circular(
+                  PosProductTile._gridCornerRadius / 2,
+                ),
+              ),
+              if (outOfStock)
+                const Positioned.fill(child: _OutOfStockOverlay(compact: true)),
+              if (quantityInCart > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: _QuantityBadge(quantity: quantityInCart),
+                ),
             ],
           ),
-        ),
-        if (trailing != null) ...[SizedBox(width: _spacing.s), trailing!],
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: _details(theme, priceStyle: theme.textTheme.bodyMedium),
+          ),
+          ?trailing,
+        ],
+      ),
     );
   }
 
-  Widget _thumb(BuildContext context, {required double size}) {
-    return Stack(
-      clipBehavior: Clip.none,
+  Widget _details(ThemeData theme, {TextStyle? priceStyle}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        ImageThumb(
-          url: imageUrl,
-          width: size,
-          height: size,
-          placeholderIcon: Icons.fastfood_outlined,
+        if (badgeLabel != null && layout == ProductTileLayout.list)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: _Pill(
+              label: badgeLabel!,
+              background: theme.colorScheme.secondary,
+              foreground: theme.colorScheme.onSecondary,
+            ),
+          ),
+        Text(
+          name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium,
         ),
-        if (badgeLabel != null)
-          Positioned(top: 0, left: 0, child: _CornerBadge(badgeLabel!)),
-        if (quantityInCart > 0)
-          Positioned(top: -6, right: -6, child: _QuantityBadge(quantityInCart)),
+        if (sku != null)
+          Text(
+            sku!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        const SizedBox(height: 4),
+        MoneyText(price, style: priceStyle),
+        // "Stok habis" itself is rendered once, in the image overlay
+        // (`_OutOfStockOverlay`) below — not repeated here, so an
+        // out-of-stock tile shows the label exactly once.
+        if (!outOfStock && stockLabel != null)
+          Text(
+            stockLabel!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
       ],
     );
-  }
-
-  Widget _name(ThemeData theme) => Text(
-    name,
-    maxLines: 2,
-    overflow: TextOverflow.ellipsis,
-    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-  );
-
-  Widget _sku(ThemeData theme) => Text(
-    sku!,
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    style: theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    ),
-  );
-
-  Widget _price(ThemeData theme) => MoneyText(
-    price,
-    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-  );
-
-  Widget _stockCaption(ThemeData theme) {
-    if (outOfStock) {
-      return Padding(
-        padding: EdgeInsets.only(top: _spacing.xs),
-        child: Text(
-          'Stok habis',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.error,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
-    }
-    if (stockLabel != null) {
-      return Padding(
-        padding: EdgeInsets.only(top: _spacing.xs),
-        child: Text(
-          stockLabel!,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      );
-    }
-    return const SizedBox.shrink();
   }
 }
 
-/// A small corner tag over the product image, e.g. a promo badge.
-class _CornerBadge extends StatelessWidget {
-  const _CornerBadge(this.label);
+/// Darkens the photo and shows the "Stok habis" label, at full opacity so
+/// it stays legible over any photo.
+class _OutOfStockOverlay extends StatelessWidget {
+  const _OutOfStockOverlay({this.compact = false});
 
-  final String label;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: _spacing.xs, vertical: 2),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF97316),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(8),
-          bottomRight: Radius.circular(8),
-        ),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
+    return ColoredBox(
+      color: Colors.black.withValues(alpha: 0.5),
+      child: Center(
+        child: Text(
+          'Stok habis',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: compact ? 9 : 11,
+          ),
         ),
       ),
     );
   }
 }
 
-/// A small circular badge showing the quantity of a product already in the
-/// cart.
 class _QuantityBadge extends StatelessWidget {
-  const _QuantityBadge(this.quantity);
+  const _QuantityBadge({required this.quantity});
 
   final int quantity;
 
@@ -260,19 +291,53 @@ class _QuantityBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+      constraints: const BoxConstraints(
+        minWidth: PosProductTile._quantityBadgeSize,
+        minHeight: PosProductTile._quantityBadgeSize,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 4),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: theme.colorScheme.primary,
-        shape: BoxShape.circle,
+        shape: quantity < 10 ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: quantity < 10
+            ? null
+            : BorderRadius.circular(PosProductTile._quantityBadgeSize),
       ),
-      alignment: Alignment.center,
       child: Text(
         '$quantity',
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onPrimary,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.bold,
         ),
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.label,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: foreground),
       ),
     );
   }

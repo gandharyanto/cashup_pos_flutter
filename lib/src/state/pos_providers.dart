@@ -1,14 +1,15 @@
-/// The SDK's core Riverpod DI wiring.
+/// The SDK's Riverpod provider registry.
 ///
-/// [CashupPos.initialize] overrides [posConfigProvider] with the host's real
-/// `PosConfig` when it builds the SDK's private `ProviderContainer` (see
-/// `cashup_pos_sdk.dart`) — [posApiClientProvider] and [posRepositoryProvider]
-/// are derived from that one override, so nothing above this file constructs
-/// a `PosApiClient` or `PosRepository` directly.
-///
-/// This file stays deliberately small: each controller (catalogue, cart,
-/// checkout, ...) owns its own providers in its own file, built on top of
-/// [posRepositoryProvider] here.
+/// [CashupPos.container] (`cashup_pos_sdk.dart`) is the only
+/// [ProviderContainer] these providers ever run in — a host never wraps its
+/// own app in a `ProviderScope` for this package (see the package's
+/// `CLAUDE.md`). [posConfigProvider] is therefore left as a placeholder body
+/// that must be overridden: `CashupPos.initialize` supplies the real
+/// [PosConfig] via `ProviderContainer(overrides: [...])` when it creates the
+/// container, the same way a host app overrides a required provider on its
+/// own `ProviderScope`. Reading it unoverridden (e.g. a container built
+/// without going through `CashupPos.initialize`) throws deliberately, the
+/// same way [CashupPos.config] does when read before initialization.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,29 +18,60 @@ import '../config/pos_config.dart';
 import '../data/pos_api_client.dart';
 import '../data/pos_repository.dart';
 import '../data/pos_repository_impl.dart';
+import '../models/discount_item.dart';
+import '../models/payment_setting.dart';
+import '../models/pos_payment_method.dart';
+import '../models/promotion_item.dart';
+import 'catalog_controller.dart';
 
-/// The active `PosConfig`. Reading it before [CashupPos.initialize]'s
-/// override is applied is a programming error, hence the default `throw`.
+/// The active host configuration. Overridden by `CashupPos.initialize` when
+/// it builds the SDK's [ProviderContainer] — never read successfully before
+/// that.
 final posConfigProvider = Provider<PosConfig>(
-  (ref) => throw UnimplementedError(),
+  (ref) => throw UnimplementedError(
+    'posConfigProvider has no default — CashupPos.initialize() must '
+    'override it with the real PosConfig before any provider reads it.',
+  ),
 );
 
-/// The dio-backed client, built from [posConfigProvider]. `PosConfig.
-/// extraHeaders` is a plain map while `PosApiClient` wants a closure, so it
-/// is adapted here.
+/// The Dio-backed client, built once per container from [posConfigProvider].
 final posApiClientProvider = Provider<PosApiClient>((ref) {
   final config = ref.watch(posConfigProvider);
   return PosApiClient(
     baseUrl: config.baseUrl,
     tokenProvider: config.tokenProvider,
-    extraHeaders: config.extraHeaders == null
-        ? null
-        : () => config.extraHeaders!,
+    extraHeaders: config.extraHeaders,
   );
 });
 
-/// The seam every controller talks to instead of [PosApiClient] directly —
-/// see the "pure online" decision in `CLAUDE.md`.
+/// The seam every screen depends on — see `PosRepository`'s doc comment.
 final posRepositoryProvider = Provider<PosRepository>(
   (ref) => PosRepositoryImpl(ref.watch(posApiClientProvider)),
+);
+
+/// The product catalogue: products, categories, and the in-memory filters
+/// applied to them. See `catalog_controller.dart`.
+final catalogControllerProvider =
+    AsyncNotifierProvider<CatalogController, CatalogState>(
+      CatalogController.new,
+    );
+
+/// The merchant's payment configuration, `null` when none has been set up
+/// yet.
+final paymentSettingProvider = FutureProvider<PaymentSetting?>(
+  (ref) => ref.watch(posRepositoryProvider).paymentSetting(),
+);
+
+final paymentMethodsProvider = FutureProvider<List<PosPaymentMethod>>(
+  (ref) => ref.watch(posRepositoryProvider).paymentMethods(),
+);
+
+/// Discounts the cashier may apply by hand.
+final activeDiscountsProvider = FutureProvider<List<DiscountItem>>(
+  (ref) => ref.watch(posRepositoryProvider).discountList(),
+);
+
+/// Promotions the calculation engine evaluates automatically.
+final activePromotionsProvider = FutureProvider<List<PromotionItem>>(
+  (ref) => ref.watch(posRepositoryProvider).activePromotions(),
 );

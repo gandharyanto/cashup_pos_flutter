@@ -1,25 +1,25 @@
-/// Visual theme tokens for the SDK's UI, ported from the Kotlin tablet
-/// feature module's design-token resources.
+/// Design tokens for the SDK's UI.
 ///
-/// Source: `feature/pos-tablet/src/main/res/values/pos_design_tokens.xml`
-/// (colours) and the `spacing_*` entries of
-/// `feature/pos-tablet/src/main/res/values/dimens.xml` (spacing). Corner
-/// radii, icon sizes and component heights from that same `dimens.xml` are
-/// layout-specific and belong to individual widgets in later tasks, not
-/// here.
+/// The colour tokens are ported verbatim from the Kotlin source of truth:
+/// `feature/pos-tablet/src/main/res/values/pos_design_tokens.xml`
+/// (`pos_token_*` colour resources — see each field's doc comment for the
+/// exact resource it mirrors and its hex value). That XML file defines only
+/// colours, no dimensions, so the spacing scale below is an original choice
+/// for this port rather than a ported value — the brief leaves the
+/// mapping/grouping to judgement as long as every XML token has a field and
+/// the hex values match exactly.
 library;
 
 import 'package:flutter/material.dart';
 
-/// The colour tokens the POS shell and its screens are built from.
-///
-/// Field names carry the semantic role, not the token's numeric or literal
-/// value, mirroring the `pos_token_*` resource names with the prefix
-/// dropped.
-class PosColors {
-  /// Creates a set of colour tokens.
-  const PosColors({
-    required this.shellBg,
+/// Immutable colour and spacing tokens, plus a [toThemeData] bridge to
+/// Flutter's [ThemeData]. Every field is `final` and the constructors carry
+/// no logic, so a `const PosTheme(...)` (or the default [PosTheme.cashup])
+/// can be built once and read on every widget build starting from later
+/// tasks without ever being rebuilt.
+class PosTheme {
+  const PosTheme({
+    required this.shellBackground,
     required this.surface,
     required this.surfaceSoft,
     required this.textOnShell,
@@ -27,122 +27,121 @@ class PosColors {
     required this.textSecondary,
     required this.strokeSoft,
     required this.accentSuccess,
+    this.spacingXs = 4,
+    this.spacingSm = 8,
+    this.spacingMd = 16,
+    this.spacingLg = 24,
+    this.spacingXl = 32,
+    this.cornerRadius = 12,
   });
 
-  /// Background of the outer POS shell/chrome. `pos_token_shell_bg`.
-  final Color shellBg;
+  /// The package default — the tokens as they stand in
+  /// `pos_design_tokens.xml` today, unmodified. A host that wants its own
+  /// palette constructs [PosTheme] directly instead.
+  const PosTheme.cashup()
+    : shellBackground = const Color(0xFF212B52),
+      surface = const Color(0xFFFFFFFF),
+      surfaceSoft = const Color(0xFFF8FAFC),
+      textOnShell = const Color(0xFFFFFFFF),
+      textPrimary = const Color(0xFF0F172A),
+      textSecondary = const Color(0xFF475569),
+      strokeSoft = const Color(0xFFE2E8F0),
+      accentSuccess = const Color(0xFF10B981),
+      spacingXs = 4,
+      spacingSm = 8,
+      spacingMd = 16,
+      spacingLg = 24,
+      spacingXl = 32,
+      cornerRadius = 12;
 
-  /// Default surface colour for cards and panels. `pos_token_surface`.
+  /// `pos_token_shell_bg` — the dark shell chrome behind the POS content
+  /// (app bar, nav rail, bottom bar).
+  final Color shellBackground;
+
+  /// `pos_token_surface` — the default card/page background on top of the
+  /// shell.
   final Color surface;
 
-  /// A softer, secondary surface colour. `pos_token_surface_soft`.
+  /// `pos_token_surface_soft` — a muted surface used for grouped or
+  /// secondary content areas.
   final Color surfaceSoft;
 
-  /// Text colour used against [shellBg]. `pos_token_text_on_shell`.
+  /// `pos_token_text_on_shell` — text/icon colour painted directly on
+  /// [shellBackground].
   final Color textOnShell;
 
-  /// Primary body text colour. `pos_token_text_primary`.
+  /// `pos_token_text_primary` — the primary text colour on [surface].
   final Color textPrimary;
 
-  /// Secondary/muted text colour. `pos_token_text_secondary`.
+  /// `pos_token_text_secondary` — secondary/muted text on [surface].
   final Color textSecondary;
 
-  /// Soft borders and dividers. `pos_token_stroke_soft`.
+  /// `pos_token_stroke_soft` — hairline borders and dividers.
   final Color strokeSoft;
 
-  /// Success/positive accent colour. `pos_token_accent_success`.
+  /// `pos_token_accent_success` — success state accent (paid, in stock,
+  /// confirmation actions).
   final Color accentSuccess;
-}
 
-/// The spacing scale used throughout the SDK's layouts, ported 1:1 from the
-/// `spacing_*` dimens (`dp` maps to logical pixels).
-class PosSpacing {
-  /// Creates a spacing scale.
-  const PosSpacing({
-    required this.xs,
-    required this.s,
-    required this.m,
-    required this.l,
-    required this.xl,
-    required this.xxl,
-  });
+  /// Spacing scale, smallest to largest. Not present in the XML source —
+  /// see the library doc comment.
+  final double spacingXs;
+  final double spacingSm;
+  final double spacingMd;
+  final double spacingLg;
+  final double spacingXl;
 
-  /// `spacing_xs` — 4dp.
-  final double xs;
+  /// Default corner radius for cards, buttons and dialogs.
+  final double cornerRadius;
 
-  /// `spacing_s` — 6dp.
-  final double s;
-
-  /// `spacing_m` — 12dp.
-  final double m;
-
-  /// `spacing_l` — 16dp.
-  final double l;
-
-  /// `spacing_xl` — 24dp.
-  final double xl;
-
-  /// `spacing_xxl` — 32dp.
-  final double xxl;
-}
-
-/// The SDK's theme: colour and spacing tokens plus a [toThemeData] bridge
-/// into Flutter's Material theming.
-class PosTheme {
-  /// Creates a theme from explicit tokens.
-  const PosTheme({required this.colors, required this.spacing});
-
-  /// The default Cashup POS theme, built from the tablet feature module's
-  /// design tokens.
-  const PosTheme.cashup()
-    : colors = const PosColors(
-        shellBg: Color(0xFF212B52),
-        surface: Color(0xFFFFFFFF),
-        surfaceSoft: Color(0xFFF8FAFC),
-        textOnShell: Color(0xFFFFFFFF),
-        textPrimary: Color(0xFF0F172A),
-        textSecondary: Color(0xFF475569),
-        strokeSoft: Color(0xFFE2E8F0),
-        accentSuccess: Color(0xFF10B981),
-      ),
-      spacing = const PosSpacing(xs: 4, s: 6, m: 12, l: 16, xl: 24, xxl: 32);
-
-  /// The colour tokens.
-  final PosColors colors;
-
-  /// The spacing scale.
-  final PosSpacing spacing;
-
-  /// Builds a Material 3 [ThemeData] for [brightness] from these tokens.
-  ///
-  /// There is no Kotlin dark-mode counterpart to mirror, so this seeds a
-  /// standard Material 3 colour scheme from the shell colour; in light mode
-  /// the token colours are overlaid onto their obvious Material roles, and
-  /// in dark mode the seeded scheme is used as-is.
+  /// Builds a Material [ThemeData] for [brightness] from these tokens.
   ThemeData toThemeData(Brightness brightness) {
-    final colorScheme = brightness == Brightness.dark
-        ? ColorScheme.fromSeed(
-            seedColor: colors.shellBg,
-            brightness: Brightness.dark,
-          )
-        : ColorScheme.fromSeed(
-            seedColor: colors.shellBg,
-            brightness: Brightness.light,
-            primary: colors.shellBg,
-            secondary: colors.accentSuccess,
-            surface: colors.surface,
-            onSurface: colors.textPrimary,
-            outline: colors.strokeSoft,
-          );
+    final isDark = brightness == Brightness.dark;
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: shellBackground,
+      brightness: brightness,
+      primary: shellBackground,
+      onPrimary: textOnShell,
+      secondary: accentSuccess,
+      onSecondary: textOnShell,
+      surface: isDark ? shellBackground : surface,
+      onSurface: isDark ? textOnShell : textPrimary,
+    );
+
+    final radius = BorderRadius.circular(cornerRadius);
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: brightness == Brightness.dark
-          ? null
-          : colors.surfaceSoft,
-      dividerColor: colors.strokeSoft,
+      scaffoldBackgroundColor: isDark ? shellBackground : surfaceSoft,
+      appBarTheme: AppBarTheme(
+        backgroundColor: shellBackground,
+        foregroundColor: textOnShell,
+        elevation: 0,
+      ),
+      cardTheme: CardThemeData(
+        color: isDark ? shellBackground : surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: strokeSoft),
+        ),
+      ),
+      dividerTheme: DividerThemeData(color: strokeSoft, space: spacingMd),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: radius),
+          padding: EdgeInsets.symmetric(
+            horizontal: spacingLg,
+            vertical: spacingSm,
+          ),
+        ),
+      ),
+      textTheme: ThemeData(brightness: brightness).textTheme.apply(
+        bodyColor: isDark ? textOnShell : textPrimary,
+        displayColor: isDark ? textOnShell : textPrimary,
+      ),
     );
   }
 }

@@ -1,24 +1,29 @@
-/// The single loading/error/empty/data switch used by every page that reads
-/// an [AsyncValue] from a Riverpod controller.
-library;
-
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'empty_state.dart';
 import 'error_state.dart';
 import 'loading_state.dart';
 
-/// Renders [value] as loading, error, empty or data, in that priority order.
+/// The single loading/error/empty/data switch used by every page that reads
+/// an `AsyncNotifier` (cart, catalogue, checkout, transactions, ...).
 ///
-/// Deliberately does not use [AsyncValue.when], which switches purely on the
-/// current variant (loading/error/data) and would tear down the [data]
-/// subtree the instant a refresh sets `isLoading: true` — even when a
-/// previous value is still attached. Checking [AsyncValue.hasValue] first
-/// instead means a background refresh keeps rendering stale data rather
-/// than flashing back to [LoadingState].
+/// [AsyncValue] is a plain value type, not a `WidgetRef` — pages pass the
+/// value they already `ref.watch`ed, so this widget stays reusable without
+/// reaching into Riverpod itself.
+///
+/// This is a [StatelessWidget]: every branch is derived straight from
+/// [value] inside [build] via [AsyncValue.when], with no internal state of
+/// its own. That matters for a background refresh (`ref.refresh` /
+/// pull-to-refresh on an already-loaded page): `AsyncValue.when`'s default
+/// `skipLoadingOnRefresh: true` routes a refreshing-with-previous-data state
+/// through the `data` branch (using the previous value) instead of the
+/// `loading` branch, so [data] keeps being rebuilt in place rather than
+/// being torn down and replaced by [LoadingState] and back — there is no
+/// separate "loading flag" tracked anywhere that could cause an extra
+/// unmount/remount of the data subtree. Only a load with no previous value
+/// at all (the four tests below) reaches the `loading` branch.
 class AsyncView<T> extends StatelessWidget {
-  /// Creates an async view over [value].
   const AsyncView({
     super.key,
     required this.value,
@@ -29,39 +34,39 @@ class AsyncView<T> extends StatelessWidget {
     this.loading,
   });
 
-  /// The async value to render.
+  /// The watched async state.
   final AsyncValue<T> value;
 
-  /// Builds the data subtree once [value] carries a non-empty value.
+  /// Builds the data subtree once [value] holds data that is not empty.
   final Widget Function(T data) data;
 
-  /// Passed to [ErrorState.fromException] as the retry action.
+  /// Passed to [ErrorState.fromException] as the retry callback.
   final VoidCallback? onRetry;
 
-  /// Reports whether a present value should be treated as empty. When null,
-  /// a present value is never considered empty.
+  /// Reports whether the loaded [T] should be treated as "nothing to show"
+  /// (e.g. an empty list). Omit to never show [empty].
   final bool Function(T data)? isEmpty;
 
-  /// Shown instead of [data] when [isEmpty] reports true. Defaults to a
-  /// generic [EmptyState].
+  /// Shown when [isEmpty] reports `true`. Defaults to a generic
+  /// [EmptyState].
   final Widget? empty;
 
-  /// Shown while [value] has neither a value nor an error. Defaults to a
-  /// generic [LoadingState].
+  /// Shown while [value] is loading with no previous data. Defaults to a
+  /// plain [LoadingState].
   final Widget? loading;
 
   @override
   Widget build(BuildContext context) {
-    if (value.hasValue) {
-      final data = value.value as T;
-      if (isEmpty != null && isEmpty!(data)) {
-        return empty ?? const EmptyState(title: 'Tidak ada data');
-      }
-      return this.data(data);
-    }
-    if (value.hasError) {
-      return ErrorState.fromException(value.error!, onRetry: onRetry);
-    }
-    return loading ?? const LoadingState();
+    return value.when(
+      data: (loaded) {
+        final showEmpty = isEmpty?.call(loaded) ?? false;
+        return showEmpty
+            ? (empty ?? const EmptyState(title: 'Tidak ada data'))
+            : data(loaded);
+      },
+      error: (error, stackTrace) =>
+          ErrorState.fromException(error, onRetry: onRetry),
+      loading: () => loading ?? const LoadingState(),
+    );
   }
 }

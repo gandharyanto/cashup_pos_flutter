@@ -1,22 +1,12 @@
-/// A single selectable payment method row, used by the payment method
-/// picker sheet.
-library;
-
 import 'package:flutter/material.dart';
 
-import '../../config/pos_theme.dart';
-
-// `Color`'s wide-gamut fields aren't const-evaluable, so this is a
-// module-level `final`, built once at load — not `const`, and never
-// rebuilt inside `build`.
-final _spacing = const PosTheme.cashup().spacing;
-
-/// A selectable payment method card: icon, name, optional subtitle.
+/// A single selectable payment method row (cash, QRIS, a card network, ...)
+/// used by the checkout payment-method picker.
 ///
-/// Rendered muted and non-interactive when [enabled] is false — e.g. a
-/// method temporarily disabled by merchant settings.
+/// [code] is the backend's payment method code — not shown, but kept on the
+/// widget so a caller building the row from a list doesn't need to carry it
+/// separately alongside the tile.
 class PaymentMethodTile extends StatelessWidget {
-  /// Creates a payment method tile.
   const PaymentMethodTile({
     super.key,
     required this.name,
@@ -27,119 +17,83 @@ class PaymentMethodTile extends StatelessWidget {
     this.onTap,
   });
 
-  /// The method's display name, e.g. `'QRIS'`.
   final String name;
-
-  /// The backend's payment method code, used by the caller to track
-  /// selection; not itself displayed.
   final String code;
-
-  /// Optional secondary caption, e.g. a fee note.
   final String? subtitle;
-
-  /// Optional asset path for the method's icon/logo. Falls back to a
-  /// generic payment icon when null or when the asset fails to load.
   final String? iconAsset;
-
-  /// Whether this method can currently be selected.
   final bool enabled;
-
-  /// Called when the tile is tapped. Ignored when [enabled] is false.
   final VoidCallback? onTap;
+
+  static const double _cornerRadius = 12;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final radius = BorderRadius.circular(12);
+    final disabledColor = theme.colorScheme.onSurface.withValues(alpha: 0.38);
 
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: Material(
-        color: theme.colorScheme.surface,
-        borderRadius: radius,
-        child: InkWell(
-          borderRadius: radius,
-          onTap: enabled ? onTap : null,
-          child: Container(
-            padding: EdgeInsets.all(_spacing.m),
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.dividerColor),
-              borderRadius: radius,
-            ),
-            child: Row(
-              children: [
-                _Icon(iconAsset: iconAsset),
-                SizedBox(width: _spacing.m),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(_cornerRadius),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              _leadingIcon(theme, disabledColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      name,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: enabled ? null : disabledColor,
+                      ),
+                    ),
+                    if (subtitle != null)
                       Text(
-                        name,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                        subtitle!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: enabled
+                              ? theme.colorScheme.onSurfaceVariant
+                              : disabledColor,
                         ),
                       ),
-                      if (subtitle != null)
-                        Text(
-                          subtitle!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
-                if (enabled)
-                  Icon(
-                    Icons.chevron_right,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-              ],
-            ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: enabled
+                    ? theme.colorScheme.onSurfaceVariant
+                    : disabledColor,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
-}
 
-/// The method's logo, or a generic placeholder when unavailable.
-class _Icon extends StatelessWidget {
-  const _Icon({required this.iconAsset});
-
-  final String? iconAsset;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final asset = iconAsset;
-    const size = 32.0;
-
-    Widget placeholder() => Icon(
-      Icons.payments_outlined,
-      size: 20,
-      color: theme.colorScheme.onSurfaceVariant,
-    );
-
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: asset == null
-          ? placeholder()
-          : Image.asset(
-              asset,
-              width: size,
-              height: size,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => placeholder(),
-            ),
+  Widget _leadingIcon(ThemeData theme, Color disabledColor) {
+    if (iconAsset != null) {
+      return SizedBox(
+        width: 32,
+        height: 32,
+        child: Image.asset(
+          iconAsset!,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) =>
+              Icon(Icons.payment, color: enabled ? null : disabledColor),
+        ),
+      );
+    }
+    return Icon(
+      Icons.payment,
+      color: enabled ? theme.colorScheme.primary : disabledColor,
     );
   }
 }

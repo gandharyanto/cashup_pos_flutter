@@ -1,19 +1,8 @@
-/// A centered "nothing here" placeholder, shown by [AsyncView] when a
-/// collection value is present but empty.
-library;
-
 import 'package:flutter/material.dart';
 
-import '../../config/pos_theme.dart';
-
-// `Color`'s wide-gamut fields aren't const-evaluable, so this is a
-// module-level `final`, built once at load — not `const`, and never
-// rebuilt inside `build`.
-final _spacing = const PosTheme.cashup().spacing;
-
-/// A full-space empty-collection placeholder.
+/// A centred icon/title/message shown when a list or page has nothing to
+/// display, with an optional action (e.g. "Tambah Produk").
 class EmptyState extends StatelessWidget {
-  /// Creates an empty state.
   const EmptyState({
     super.key,
     required this.title,
@@ -22,16 +11,9 @@ class EmptyState extends StatelessWidget {
     this.action,
   });
 
-  /// The headline, e.g. `'Belum ada transaksi'`.
   final String title;
-
-  /// Optional supporting copy below [title].
   final String? message;
-
-  /// Optional icon shown above [title].
   final IconData? icon;
-
-  /// Optional call to action (e.g. a "coba muat ulang" button).
   final Widget? action;
 
   @override
@@ -39,30 +21,32 @@ class EmptyState extends StatelessWidget {
     final theme = Theme.of(context);
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(_spacing.l),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
-              Icon(icon, size: 40, color: theme.colorScheme.onSurfaceVariant),
-              SizedBox(height: _spacing.m),
-            ],
+            Icon(
+              icon ?? Icons.inbox_outlined,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
             Text(
               title,
-              textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
             ),
             if (message != null) ...[
-              SizedBox(height: _spacing.xs),
+              const SizedBox(height: 8),
               Text(
                 message!,
-                textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
-            if (action != null) ...[SizedBox(height: _spacing.l), action!],
+            if (action != null) ...[const SizedBox(height: 16), action!],
           ],
         ),
       ),

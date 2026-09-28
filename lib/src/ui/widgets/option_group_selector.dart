@@ -1,29 +1,35 @@
-/// Renders variant and modifier groups with single/multi selection and
-/// min/max enforcement. Used by the add-to-cart sheet and the product
-/// editor.
-library;
-
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 
-import '../../config/pos_theme.dart';
-import '../../models/option_group.dart';
 import '../../util/currency.dart';
 
-// `Color`'s wide-gamut fields aren't const-evaluable, so this is a
-// module-level `final`, built once at load — not `const`, and never
-// rebuilt inside `build`.
-final _spacing = const PosTheme.cashup().spacing;
+/// One selectable choice inside a [PosOptionGroup] — a variant ("Large") or
+/// a modifier ("Extra shot") — with its own price adjustment.
+typedef PosOptionChoice = ({int id, String name, double priceDelta});
 
-/// The chosen option ids for one [OptionGroup].
+/// One variant or modifier group rendered by [OptionGroupSelector].
+///
+/// [multiSelect] `false` renders the group as single-choice (radio); `true`
+/// renders it as multi-choice (checkboxes) with [min]/[max] selections
+/// enforced.
+typedef PosOptionGroup = ({
+  int id,
+  String name,
+  bool multiSelect,
+  int min,
+  int max,
+  List<PosOptionChoice> options,
+});
+
+/// One group's current selection: the chosen option ids within [groupId].
+///
+/// Kept separately from [PosOptionGroup] (rather than an `isSelected` flag
+/// on each option) so the caller's selection state stays a plain,
+/// immutable value it can diff and persist on its own.
 class OptionGroupSelection {
-  /// Creates a group selection.
   const OptionGroupSelection({required this.groupId, required this.optionIds});
 
-  /// The group these option ids belong to.
   final int groupId;
-
-  /// The selected option ids within that group.
   final List<int> optionIds;
 }
 
@@ -31,11 +37,11 @@ class OptionGroupSelection {
 /// enforcement and running price adjustment. Used by the add-to-cart sheet
 /// and the product editor.
 ///
-/// Each option row shows only its own price delta (e.g. `'+Rp 5.000'`) —
-/// this widget does not sum a grand total; that is a page-level concern
-/// composed alongside it (e.g. a totals panel driven off [selections]).
+/// Holds no selection state itself: every tap builds a brand-new
+/// [OptionGroupSelection] list from [selections] and hands it to
+/// [onChanged] — the caller owns the source of truth, matching the
+/// immutable-update convention used across the SDK.
 class OptionGroupSelector extends StatelessWidget {
-  /// Creates an option group selector.
   const OptionGroupSelector({
     super.key,
     required this.groups,
@@ -43,45 +49,48 @@ class OptionGroupSelector extends StatelessWidget {
     required this.onChanged,
   });
 
-  /// The variant/modifier groups to render, in order.
-  final List<OptionGroup> groups;
-
-  /// The current selection, one entry per group that has at least one
-  /// option chosen.
+  final List<PosOptionGroup> groups;
   final List<OptionGroupSelection> selections;
-
-  /// Called with the full, updated selection list whenever a row's checked
-  /// state changes.
   final ValueChanged<List<OptionGroupSelection>> onChanged;
 
-  List<int> _selectedIdsFor(int groupId) =>
-      selections.firstWhereOrNull((s) => s.groupId == groupId)?.optionIds ??
-      const [];
-
-  void _toggle(OptionGroup group, OptionItem option) {
-    final current = _selectedIdsFor(group.groupId);
-    final List<int> updated;
-    if (group.isSingleSelection) {
-      updated = [option.optionId];
-    } else if (current.contains(option.optionId)) {
-      updated = List.of(current)..remove(option.optionId);
-    } else if (group.hasSelectionLimit &&
-        current.length >= group.maxSelection) {
-      // Row should already be disabled in this state; guard defensively.
-      return;
-    } else {
-      updated = List.of(current)..add(option.optionId);
+  List<int> _selectedIdsFor(int groupId) {
+    for (final selection in selections) {
+      if (selection.groupId == groupId) return selection.optionIds;
     }
+    return const [];
+  }
 
-    final next = selections
-        .where((s) => s.groupId != group.groupId)
-        .toList(growable: true);
-    if (updated.isNotEmpty) {
-      next.add(
-        OptionGroupSelection(groupId: group.groupId, optionIds: updated),
-      );
-    }
+  void _replaceGroupSelection(int groupId, List<int> optionIds) {
+    final next = [
+      for (final selection in selections)
+        if (selection.groupId != groupId) selection,
+      OptionGroupSelection(groupId: groupId, optionIds: optionIds),
+    ];
     onChanged(next);
+  }
+
+  /// Handles a [RadioGroup.onChanged] callback for a single-select group.
+  /// `null` arrives when the selected [RadioListTile] is toggled off (only
+  /// possible when [PosOptionGroup.min] is 0, since that is the only case a
+  /// radio row is built with `toggleable: true`).
+  void _handleSingleSelect(PosOptionGroup group, int? optionId) {
+    _replaceGroupSelection(group.id, optionId == null ? const [] : [optionId]);
+  }
+
+  void _handleMultiToggle(PosOptionGroup group, int optionId, bool select) {
+    final current = _selectedIdsFor(group.id);
+    if (select) {
+      if (current.contains(optionId)) return;
+      if (current.length >= group.max) return;
+      _replaceGroupSelection(group.id, [...current, optionId]);
+      return;
+    }
+    if (!current.contains(optionId)) return;
+    if (current.length <= group.min) return;
+    _replaceGroupSelection(
+      group.id,
+      current.where((id) => id != optionId).toList(),
+    );
   }
 
   @override
@@ -90,120 +99,125 @@ class OptionGroupSelector extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (var i = 0; i < groups.length; i++) ...[
-          if (i > 0) SizedBox(height: _spacing.l),
-          _buildGroup(context, groups[i]),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildGroup(BuildContext context, OptionGroup group) {
-    final theme = Theme.of(context);
-    final requiredWord = group.isRequired ? 'Wajib' : 'Opsional';
-    final ruleWord = group.isSingleSelection
-        ? '1'
-        : (group.hasSelectionLimit ? 'maks ${group.maxSelection}' : 'beberapa');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          group.name,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          '$requiredWord • Pilih $ruleWord',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        SizedBox(height: _spacing.xs),
-        for (var i = 0; i < group.options.length; i++) ...[
-          if (i > 0) Divider(height: 1, color: theme.dividerColor),
-          _OptionRow(
-            group: group,
-            option: group.options[i],
-            selectedIds: _selectedIdsFor(group.groupId),
-            onTap: () => _toggle(group, group.options[i]),
-          ),
+        for (final group in groups) ...[
+          _GroupHeader(group: group),
+          if (group.multiSelect)
+            for (final option in group.options)
+              _MultiOptionRow(
+                option: option,
+                selected: _selectedIdsFor(group.id).contains(option.id),
+                onToggle: (value) =>
+                    _handleMultiToggle(group, option.id, value ?? false),
+                atMax:
+                    !_selectedIdsFor(group.id).contains(option.id) &&
+                    _selectedIdsFor(group.id).length >= group.max,
+              )
+          else
+            RadioGroup<int>(
+              groupValue: _selectedIdsFor(group.id).firstOrNull,
+              onChanged: (value) => _handleSingleSelect(group, value),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final option in group.options)
+                    _SingleOptionRow(
+                      option: option,
+                      toggleable: group.min == 0,
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
         ],
       ],
     );
   }
 }
 
-/// One selectable option row: a radio/checkbox indicator, the option name
-/// and its price delta.
-class _OptionRow extends StatelessWidget {
-  const _OptionRow({
-    required this.group,
-    required this.option,
-    required this.selectedIds,
-    required this.onTap,
-  });
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({required this.group});
 
-  final OptionGroup group;
-  final OptionItem option;
-  final List<int> selectedIds;
-  final VoidCallback onTap;
+  final PosOptionGroup group;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final selected = selectedIds.contains(option.optionId);
-    final limitReached =
-        !group.isSingleSelection &&
-        group.hasSelectionLimit &&
-        selectedIds.length >= group.maxSelection;
-    final disabled = !selected && limitReached;
-    final icon = group.isSingleSelection
-        ? (selected ? Icons.radio_button_checked : Icons.radio_button_unchecked)
-        : (selected ? Icons.check_box : Icons.check_box_outline_blank);
-    final deltaText = _priceDeltaText(option.priceAdjustment);
-    final indicatorColor = disabled
-        ? theme.disabledColor
-        : (selected
-              ? theme.colorScheme.primary
-              : theme.colorScheme.onSurfaceVariant);
-
-    return InkWell(
-      onTap: disabled ? null : onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: _spacing.s),
-        child: Row(
-          children: [
-            Icon(icon, color: indicatorColor, size: 20),
-            SizedBox(width: _spacing.s),
-            Expanded(
-              child: Text(
-                option.name,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: disabled ? theme.disabledColor : null,
-                ),
-              ),
+    final hint = group.multiSelect
+        ? 'Pilih ${group.min}-${group.max}'
+        : (group.min > 0 ? 'Wajib pilih 1' : 'Opsional');
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Row(
+        children: [
+          Expanded(child: Text(group.name, style: theme.textTheme.titleSmall)),
+          Text(
+            hint,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            if (deltaText.isNotEmpty)
-              Text(
-                deltaText,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: disabled
-                      ? theme.disabledColor
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  String _priceDeltaText(double adjustment) {
-    if (adjustment == 0) return '';
-    final formatted = Money.format(adjustment.abs());
-    return adjustment > 0 ? '+$formatted' : '-$formatted';
+/// Renders [option]'s price adjustment as `+Rp 5.000`, or nothing for a
+/// zero-cost option.
+Widget? _priceLabel(BuildContext context, PosOptionChoice option) {
+  if (option.priceDelta == 0) return null;
+  final theme = Theme.of(context);
+  return Text(
+    '+${Money.format(option.priceDelta)}',
+    style: theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    ),
+  );
+}
+
+class _MultiOptionRow extends StatelessWidget {
+  const _MultiOptionRow({
+    required this.option,
+    required this.selected,
+    required this.onToggle,
+    required this.atMax,
+  });
+
+  final PosOptionChoice option;
+  final bool selected;
+  final ValueChanged<bool?> onToggle;
+  final bool atMax;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = !selected && atMax;
+    return CheckboxListTile(
+      value: selected,
+      onChanged: disabled ? null : onToggle,
+      title: Text(option.name),
+      secondary: _priceLabel(context, option),
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+    );
+  }
+}
+
+class _SingleOptionRow extends StatelessWidget {
+  const _SingleOptionRow({required this.option, required this.toggleable});
+
+  final PosOptionChoice option;
+  final bool toggleable;
+
+  @override
+  Widget build(BuildContext context) {
+    return RadioListTile<int>(
+      value: option.id,
+      toggleable: toggleable,
+      title: Text(option.name),
+      secondary: _priceLabel(context, option),
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+    );
   }
 }

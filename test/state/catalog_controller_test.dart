@@ -34,7 +34,9 @@ void main() {
       container.read(catalogControllerProvider.notifier).selectCategory(20);
       await container.pump();
 
-      final state = container.read(catalogControllerProvider).requireValue;
+      final CatalogState state = container
+          .read(catalogControllerProvider)
+          .requireValue;
       expect(state.visibleProducts.single.name, 'Teh');
       expect(repo.productListCalls, 1, reason: 'filtering must not refetch');
     },

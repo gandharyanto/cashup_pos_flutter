@@ -1,24 +1,26 @@
-/// The catalogue controller: loads products and categories once per POS
-/// session and filters them in memory from then on.
+/// The product catalogue: one network fetch, then in-memory filtering.
 ///
-/// This is rule 8 of the performance budget in `CLAUDE.md` /
-/// `flutter-pos-dev` — `selectCategory` and `setQuery` must never trigger
-/// another `PosRepository.productList` call, so `visibleProducts` is a pure
-/// getter over the already-loaded [CatalogState.products] rather than
-/// anything that re-fetches.
+/// Performance rule 8 of the package's performance budget: category and
+/// search filtering must never trigger another `PosRepository.productList`
+/// or `categoryList` call. [CatalogController.build] is the only place that
+/// fetches; [CatalogController.selectCategory] and
+/// [CatalogController.setQuery] only update [CatalogState] fields, and
+/// [CatalogState.visibleProducts] recomputes the filtered list from the
+/// already-loaded [CatalogState.products] every time it is read.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/discount_item.dart';
 import '../models/option_group.dart';
-import '../models/payment_setting.dart';
 import '../models/pos_category.dart';
 import '../models/pos_product.dart';
-import '../models/promotion_item.dart';
 import 'pos_providers.dart';
 
-/// The catalogue's loaded data plus in-memory filter/layout state.
+/// The catalogue's loaded data plus the filters currently applied to it.
+///
+/// [visibleProducts] is a getter, not a field, so it always reflects the
+/// current [selectedCategoryId] / [query] against [products] without any
+/// extra fetch or cached derived list to keep in sync.
 class CatalogState {
   const CatalogState({
     this.products = const [],
@@ -29,23 +31,33 @@ class CatalogState {
     this.isGrid = true,
   });
 
+  /// Every product loaded for the merchant, unfiltered.
   final List<PosProduct> products;
+
+  /// Every category loaded for the merchant.
   final List<PosCategory> categories;
+
+  /// Relative image paths in [products] resolve against this.
   final String? baseUrl;
+
+  /// `null` means "all categories".
   final int? selectedCategoryId;
+
+  /// Matched case-insensitively against a product's name and SKU.
   final String query;
+
+  /// Grid vs. list layout for the product picker. Purely a UI preference —
+  /// never sent to the backend.
   final bool isGrid;
 
-  /// [products] narrowed by [selectedCategoryId] and [query], recomputed on
-  /// every read rather than cached — cheap over a single merchant's
-  /// catalogue, and it keeps this the single source of truth callers (a
-  /// future catalogue page) read instead of re-deriving it themselves.
+  /// [products] filtered by [selectedCategoryId] and [query], computed fresh
+  /// on every read. Never triggers a network request.
   List<PosProduct> get visibleProducts {
+    final categoryId = selectedCategoryId;
     final normalizedQuery = query.trim().toLowerCase();
     return products
         .where((product) {
-          if (selectedCategoryId != null &&
-              !product.categoryIds.contains(selectedCategoryId)) {
+          if (categoryId != null && !product.categoryIds.contains(categoryId)) {
             return false;
           }
           if (normalizedQuery.isEmpty) return true;
@@ -61,30 +73,41 @@ class CatalogState {
     List<PosProduct>? products,
     List<PosCategory>? categories,
     String? baseUrl,
-    int? selectedCategoryId,
-    bool clearSelectedCategoryId = false,
+    // A nullable field needs a way to be explicitly cleared, which a plain
+    // `int?` parameter can't distinguish from "leave unchanged" — wrapping
+    // it in a getter function is the usual workaround.
+    int? Function()? selectedCategoryId,
     String? query,
     bool? isGrid,
-  }) {
-    return CatalogState(
-      products: products ?? this.products,
-      categories: categories ?? this.categories,
-      baseUrl: baseUrl ?? this.baseUrl,
-      selectedCategoryId: clearSelectedCategoryId
-          ? null
-          : (selectedCategoryId ?? this.selectedCategoryId),
-      query: query ?? this.query,
-      isGrid: isGrid ?? this.isGrid,
-    );
-  }
+  }) => CatalogState(
+    products: products ?? this.products,
+    categories: categories ?? this.categories,
+    baseUrl: baseUrl ?? this.baseUrl,
+    selectedCategoryId: selectedCategoryId != null
+        ? selectedCategoryId()
+        : this.selectedCategoryId,
+    query: query ?? this.query,
+    isGrid: isGrid ?? this.isGrid,
+  );
 }
 
-/// Loads the catalogue once via [posRepositoryProvider] and exposes
-/// in-memory filtering/layout operations over it.
+/// Loads the catalogue once and exposes in-memory filtering over it.
 class CatalogController extends AsyncNotifier<CatalogState> {
   @override
-  Future<CatalogState> build() async {
-    final repository = ref.watch(posRepositoryProvider);
+  Future<CatalogState> build() => _fetch(previous: null);
+
+  /// Re-fetches products and categories from the network, preserving the
+  /// currently applied filters and layout. Unlike [selectCategory] /
+  /// [setQuery], this is the only other place (besides [build]) that talks
+  /// to [PosRepository].
+  Future<void> refresh() async {
+    final previous = state.valueOrNull;
+    state = const AsyncValue<CatalogState>.loading().copyWithPrevious(state);
+    state = await AsyncValue.guard(() => _fetch(previous: previous));
+  }
+
+  Future<CatalogState> _fetch({required CatalogState? previous}) async {
+    final repository = ref.read(posRepositoryProvider);
     final productsFuture = repository.productList();
     final categoriesFuture = repository.categoryList();
     final productsResult = await productsFuture;
@@ -92,38 +115,30 @@ class CatalogController extends AsyncNotifier<CatalogState> {
     return CatalogState(
       products: productsResult.items,
       categories: categoriesResult.items,
-      baseUrl: productsResult.baseUrl ?? categoriesResult.baseUrl,
+      baseUrl: productsResult.baseUrl,
+      selectedCategoryId: previous?.selectedCategoryId,
+      query: previous?.query ?? '',
+      isGrid: previous?.isGrid ?? true,
     );
   }
 
-  /// Re-fetches products and categories from scratch, e.g. after a pull to
-  /// refresh — the only path that is allowed to hit the network again.
-  Future<void> refresh() async {
-    ref.invalidateSelf();
-    await future;
-  }
-
-  /// Filters [CatalogState.visibleProducts] to [categoryId] in memory. Pass
-  /// `null` to clear the filter.
+  /// Filters [CatalogState.visibleProducts] to [categoryId]; `null` clears
+  /// the filter. Purely in-memory — never refetches.
   void selectCategory(int? categoryId) {
     final current = state.valueOrNull;
     if (current == null) return;
-    state = AsyncData(
-      current.copyWith(
-        selectedCategoryId: categoryId,
-        clearSelectedCategoryId: categoryId == null,
-      ),
-    );
+    state = AsyncData(current.copyWith(selectedCategoryId: () => categoryId));
   }
 
-  /// Filters [CatalogState.visibleProducts] by name/SKU in memory.
+  /// Filters [CatalogState.visibleProducts] by name/SKU. Purely in-memory —
+  /// never refetches.
   void setQuery(String query) {
     final current = state.valueOrNull;
     if (current == null) return;
     state = AsyncData(current.copyWith(query: query));
   }
 
-  /// Toggles between grid and list layout.
+  /// Toggles between grid and list layout for the product picker.
   void toggleLayout() {
     final current = state.valueOrNull;
     if (current == null) return;
@@ -131,32 +146,8 @@ class CatalogController extends AsyncNotifier<CatalogState> {
   }
 
   /// Fetches a product's variant/modifier groups on demand — unlike
-  /// products and categories, this is naturally per-product and not part of
-  /// the up-front catalogue load.
-  Future<ProductOptionGroups?> optionGroups(int productId) {
-    return ref.read(posRepositoryProvider).productOptionGroups(productId);
-  }
+  /// products/categories, option groups are not preloaded because most
+  /// products in a catalogue have none.
+  Future<ProductOptionGroups?> optionGroups(int productId) =>
+      ref.read(posRepositoryProvider).productOptionGroups(productId);
 }
-
-/// The catalogue: products, categories, and their in-memory filter/layout
-/// state.
-final catalogControllerProvider =
-    AsyncNotifierProvider<CatalogController, CatalogState>(
-      CatalogController.new,
-    );
-
-/// The merchant's payment setting (tax/rounding/service charge), or `null`
-/// if none has been configured yet.
-final paymentSettingProvider = FutureProvider<PaymentSetting?>(
-  (ref) => ref.watch(posRepositoryProvider).paymentSetting(),
-);
-
-/// Discounts currently available to apply at checkout.
-final activeDiscountsProvider = FutureProvider<List<DiscountItem>>(
-  (ref) => ref.watch(posRepositoryProvider).discountList(),
-);
-
-/// Promotions currently active for this merchant.
-final activePromotionsProvider = FutureProvider<List<PromotionItem>>(
-  (ref) => ref.watch(posRepositoryProvider).activePromotions(),
-);

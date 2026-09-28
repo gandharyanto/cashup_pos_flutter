@@ -1,15 +1,11 @@
-/// The seam between everything above `data/` and the `/pos/*` backend.
+/// The seam between the pure-online decision and everything above `data/`.
 ///
-/// Ported from `pos-core/.../data/repositories/PosRepositoryImpl.kt` — only
-/// the request/response shapes carry over, not the `LiveData` plumbing (the
-/// Kotlin source predates coroutines in most of this file and wraps every
-/// call in a `LiveData<ApiResponse<T>>`; Dart's `Future` plus
-/// [PosException] replaces that entirely).
-///
-/// This is the reversible half of the pure-online decision documented in
-/// `CLAUDE.md`: a future caching or outbox-backed implementation can
-/// `implement PosRepository` without state or UI code changing at all.
-/// Nothing above `data/` may reach past this interface to [PosApiClient].
+/// `PosRepositoryImpl` is the only implementation today — there is no local
+/// cache or outbox (see the package's `CLAUDE.md`: "pure online" is an
+/// explicit product decision, and a dropped connection halts sales rather
+/// than queuing). This abstract class exists anyway so a future caching or
+/// outbox implementation is a drop-in replacement: `state/` and `ui/` code
+/// must depend on [PosRepository], never reach past it to `PosApiClient`.
 library;
 
 import '../models/create_transaction_request.dart';
@@ -17,10 +13,7 @@ import '../models/discount_item.dart';
 import '../models/option_group.dart';
 import '../models/paged_result.dart';
 import '../models/payment_setting.dart';
-import '../models/pos_area.dart';
 import '../models/pos_category.dart';
-import '../models/pos_lookup_page.dart';
-import '../models/pos_merchant_summary.dart';
 import '../models/pos_payment_method.dart';
 import '../models/pos_product.dart';
 import '../models/promotion_item.dart';
@@ -28,98 +21,12 @@ import '../models/stock_movement.dart';
 import '../models/summary_report.dart';
 import '../models/transaction_details.dart';
 import '../models/transaction_summary.dart';
-import 'pos_api_client.dart';
 
-abstract class PosRepository {
-  Future<PagedResult<PosProduct>> productList({
-    int size = 100,
-    int? categoryId,
-    String? keyword,
-    String? upc,
-    String? sku,
-    String? sortBy,
-    String? sortDir,
-  });
-  Future<PosProduct> productDetail(int productId);
-  Future<int> productCreate(PosProductDraft draft);
-  Future<void> productUpdate(int productId, PosProductDraft draft);
-  Future<void> productDelete(int productId);
-  Future<ProductOptionGroups?> productOptionGroups(int productId);
-
-  Future<PagedResult<PosCategory>> categoryList({int size = 100});
-  Future<PosCategory> categoryDetail(int categoryId);
-  Future<int> categoryCreate(PosCategoryDraft draft);
-  Future<void> categoryUpdate(int categoryId, PosCategoryDraft draft);
-  Future<void> categoryDelete(int categoryId);
-
-  Future<void> stockUpdate({
-    required int productId,
-    required int qty,
-    required String updateType,
-  });
-  Future<PagedResult<StockMovementRow>> stockMovements({
-    required int productId,
-    required DateTime startDate,
-    required DateTime endDate,
-  });
-
-  Future<PaymentSetting?> paymentSetting();
-  Future<void> paymentSettingCreate(PaymentSetting setting);
-  Future<void> paymentSettingUpdate(PaymentSetting setting);
-  Future<List<PosPaymentMethod>> paymentMethods();
-
-  Future<CreatedTransaction> transactionCreate(
-    CreateTransactionRequest request,
-  );
-  Future<TransactionDetails> transactionDetail(int transactionId);
-  Future<void> transactionUpdate(
-    String merchantTrxId,
-    UpdateTransactionRequest request,
-  );
-  Future<PagedResult<TransactionSummaryRow>> transactionList({
-    required int page,
-    required int size,
-    required DateTime startDate,
-    required DateTime endDate,
-    String sortBy = 'transactionDate',
-    String sortType = 'DESC',
-  });
-
-  Future<SummaryReportData> summaryReport({
-    required DateTime startDate,
-    required DateTime endDate,
-  });
-  Future<List<DiscountItem>> discountList();
-  Future<List<PromotionItem>> activePromotions();
-
-  // ── Area & merchant directory (placeholder paths, confirmed item shape) ──
-  //
-  // No such endpoint exists anywhere in the pinned Kotlin source this
-  // package ports from — see the doc comments on [PosRepositoryImpl]'s
-  // implementations for details. Designed to be swappable with no ripple
-  // beyond this layer once the paths are confirmed. The response envelope
-  // (`PosLookupPage`) is taken from a real backend sample, distinct from
-  // the rest of `/pos/*`'s `PagedResult` envelope — see that class's doc.
-
-  Future<PosLookupPage<PosArea>> areaList({int size = 100, String? keyword});
-  Future<PosLookupPage<PosMerchantSummary>> merchantList({
-    int size = 100,
-    String? keyword,
-  });
-  Future<PosLookupPage<PosMerchantSummary>> merchantsByArea({
-    required int areaId,
-    int size = 100,
-    String? keyword,
-  });
-}
-
-/// The `pos/product/add` / `pos/product/update` payload.
+/// The fields needed to create or update a product.
 ///
-/// One carrier serves both endpoints — [PosRepositoryImpl] adds `productId`
-/// for an update and `qty` for a create, mirroring the two distinct request
-/// shapes `PosCreateProductRequest` / `PosUpdateProductRequest` on the
-/// Kotlin side (the update request has no `qty` field: stock is changed
-/// only through [PosRepository.stockUpdate]).
+/// Mirrors `PosCreateProductRequest` / `PosUpdateProductRequest`
+/// (`pos-core/.../data/request/`) — the only difference between the two
+/// wire shapes is [qty], which the update request does not carry.
 class PosProductDraft {
   const PosProductDraft({
     required this.name,
@@ -141,12 +48,45 @@ class PosProductDraft {
   final String imageThumbUrl;
   final String description;
 
-  /// Only sent on create — see the class doc.
+  /// Sent only on create — `PosUpdateProductRequest` has no `qty` field.
   final int qty;
+
+  /// Omitted from the request body entirely when `null`, matching the
+  /// Kotlin request's `List<Long>? = null` default.
   final List<int>? categoryIds;
+
+  /// The `pos/product/add` request body.
+  Map<String, dynamic> toCreateJson() => {
+    'name': name,
+    'price': price,
+    'sku': sku,
+    'upc': upc,
+    'imageUrl': imageUrl,
+    'imageThumbUrl': imageThumbUrl,
+    'description': description,
+    'qty': qty,
+    if (categoryIds != null) 'categoryIds': categoryIds,
+  };
+
+  /// The `pos/product/update` request body.
+  Map<String, dynamic> toUpdateJson(int productId) => {
+    'productId': productId,
+    'name': name,
+    'price': price,
+    'sku': sku,
+    'upc': upc,
+    'imageUrl': imageUrl,
+    'imageThumbUrl': imageThumbUrl,
+    'description': description,
+    if (categoryIds != null) 'categoryIds': categoryIds,
+  };
 }
 
-/// The `pos/category/single/add` / `pos/category/update` payload.
+/// The fields needed to create or update a category.
+///
+/// Mirrors `PosCreateCategoryRequest` / `PosUpdateCategoryRequest` — the two
+/// wire shapes differ only by the `categoryId` path/body value the update
+/// request carries.
 class PosCategoryDraft {
   const PosCategoryDraft({
     required this.name,
@@ -157,4 +97,104 @@ class PosCategoryDraft {
   final String name;
   final String image;
   final String description;
+
+  /// The `pos/category/single/add` request body.
+  Map<String, dynamic> toCreateJson() => {
+    'name': name,
+    'image': image,
+    'description': description,
+  };
+
+  /// The `pos/category/update` request body.
+  Map<String, dynamic> toUpdateJson(int categoryId) => {
+    'categoryId': categoryId,
+    'name': name,
+    'image': image,
+    'description': description,
+  };
+}
+
+/// Online access to every `/pos/*` operation the SDK needs.
+///
+/// See the library doc comment above: this is the reversibility seam for the
+/// pure-online decision, not an abstraction over multiple live backends.
+abstract class PosRepository {
+  Future<PagedResult<PosProduct>> productList({
+    int size = 100,
+    int? categoryId,
+    String? keyword,
+    String? upc,
+    String? sku,
+    String? sortBy,
+    String? sortDir,
+  });
+
+  Future<PosProduct> productDetail(int productId);
+
+  Future<int> productCreate(PosProductDraft draft);
+
+  Future<void> productUpdate(int productId, PosProductDraft draft);
+
+  Future<void> productDelete(int productId);
+
+  Future<ProductOptionGroups?> productOptionGroups(int productId);
+
+  Future<PagedResult<PosCategory>> categoryList({int size = 100});
+
+  Future<PosCategory> categoryDetail(int categoryId);
+
+  Future<int> categoryCreate(PosCategoryDraft draft);
+
+  Future<void> categoryUpdate(int categoryId, PosCategoryDraft draft);
+
+  Future<void> categoryDelete(int categoryId);
+
+  Future<void> stockUpdate({
+    required int productId,
+    required int qty,
+    required String updateType,
+  });
+
+  Future<PagedResult<StockMovementRow>> stockMovements({
+    required int productId,
+    required DateTime startDate,
+    required DateTime endDate,
+  });
+
+  Future<PaymentSetting?> paymentSetting();
+
+  Future<void> paymentSettingCreate(PaymentSetting setting);
+
+  Future<void> paymentSettingUpdate(PaymentSetting setting);
+
+  Future<List<PosPaymentMethod>> paymentMethods();
+
+  Future<CreatedTransaction> transactionCreate(
+    CreateTransactionRequest request,
+  );
+
+  Future<TransactionDetails> transactionDetail(int transactionId);
+
+  Future<void> transactionUpdate(
+    String merchantTrxId,
+    UpdateTransactionRequest request,
+  );
+
+  Future<PagedResult<TransactionSummaryRow>> transactionList({
+    required int page,
+    required int size,
+    required DateTime startDate,
+    required DateTime endDate,
+    String sortBy = 'transactionDate',
+    String sortType = 'DESC',
+  });
+
+  Future<SummaryReportData> summaryReport({
+    required DateTime startDate,
+    required DateTime endDate,
+  });
+
+  Future<List<DiscountItem>> discountList();
+
+  Future<List<PromotionItem>> activePromotions();
 }

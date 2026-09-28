@@ -2,23 +2,13 @@ import 'package:cashup_pos/src/models/option_group.dart';
 import 'package:cashup_pos/src/util/cart_key.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Minimal, valid [VariantOption] for cart-key tests.
-VariantOption variant(int id, {double price = 0}) => VariantOption(
-  id: id,
-  variantGroupId: 1,
-  name: 'Variant$id',
-  additionalPrice: price,
-);
-
-/// Minimal, valid [ModifierOption] for cart-key tests.
-ModifierOption modifier(int id, {double price = 0}) => ModifierOption(
-  id: id,
-  productId: 1,
-  name: 'Modifier$id',
-  additionalPrice: price,
-);
-
 void main() {
+  VariantOption variant(int id) =>
+      VariantOption(id: id, variantGroupId: 1, name: 'Variant $id');
+
+  ModifierOption modifier(int id) =>
+      ModifierOption(id: id, productId: 12, name: 'Modifier $id');
+
   test('a plain product keys on its id alone', () {
     expect(buildCartKey(productId: 12), '12');
   });

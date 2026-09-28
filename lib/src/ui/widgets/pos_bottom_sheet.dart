@@ -1,24 +1,12 @@
-/// The SDK's modal bottom sheet chrome: a drag handle, a title, and the
-/// caller's content — the shell every sheet (numeric keypad, variant
-/// picker, schedule picker) is built on.
-library;
-
 import 'package:flutter/material.dart';
 
-import '../../config/pos_theme.dart';
-import 'section_header.dart';
-
-// `Color`'s wide-gamut fields aren't const-evaluable, so this is a
-// module-level `final`, built once at load — not `const`, and never
-// rebuilt inside `build`.
-final _spacing = const PosTheme.cashup().spacing;
-
-/// Shows a modal bottom sheet with the SDK's standard chrome: rounded top
-/// corners, a small drag handle, and [title] above content built by
-/// [builder].
+/// Shows a modal bottom sheet with the SDK's standard chrome: a title row
+/// with a close button, then whatever [builder] returns.
 ///
-/// [maxHeightFactor], a fraction of the screen height, caps the sheet's
-/// height; content taller than that scrolls. Defaults to 90% of the screen.
+/// [isScrollControlled] defaults to `true` so the sheet can grow to fit
+/// content taller than half the screen (a numeric keypad, a long form)
+/// without being clipped. Pass [maxHeightFactor] (0–1) to additionally cap
+/// the sheet's height and let [builder]'s content scroll internally.
 Future<T?> showPosBottomSheet<T>(
   BuildContext context, {
   required String title,
@@ -26,55 +14,57 @@ Future<T?> showPosBottomSheet<T>(
   bool isScrollControlled = true,
   double? maxHeightFactor,
 }) {
-  final theme = Theme.of(context);
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: isScrollControlled,
-    backgroundColor: theme.colorScheme.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
     builder: (sheetContext) {
+      final theme = Theme.of(sheetContext);
       final media = MediaQuery.of(sheetContext);
-      final maxHeight = media.size.height * (maxHeightFactor ?? 0.9);
-      return SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxHeight),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: _spacing.s),
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.dividerColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    _spacing.l,
-                    _spacing.m,
-                    _spacing.l,
-                    0,
-                  ),
-                  child: SectionHeader(title),
-                ),
-                Flexible(
-                  child: Padding(
-                    padding: EdgeInsets.all(_spacing.l),
-                    child: builder(sheetContext),
-                  ),
-                ),
-              ],
-            ),
+      final header = Row(
+        children: [
+          Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+          IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Tutup',
+            onPressed: () => Navigator.of(sheetContext).pop(),
           ),
+        ],
+      );
+
+      final body = Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 8,
+          bottom: 16 + media.viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            header,
+            const SizedBox(height: 12),
+            if (maxHeightFactor != null)
+              Flexible(child: builder(sheetContext))
+            else
+              builder(sheetContext),
+          ],
+        ),
+      );
+
+      if (maxHeightFactor == null) {
+        return SafeArea(child: body);
+      }
+
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: media.size.height * maxHeightFactor,
+          ),
+          child: body,
         ),
       );
     },

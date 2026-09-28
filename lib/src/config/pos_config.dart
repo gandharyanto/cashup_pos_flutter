@@ -1,26 +1,23 @@
-/// The host-supplied configuration the SDK is initialized with.
+/// Host-supplied configuration for the SDK.
 ///
-/// This is the single point of contact between a host app and the SDK: the
-/// backend base URL and auth, merchant branding, the two payment seams
-/// ([PosPaymentHandler] for card/EDC/CDCP, [QrisGateway] for QRIS), the
-/// visual theme, feature toggles and a callback for completed transactions.
-/// `CashupPos.initialize` stores one of these and every layer below reads it
-/// through the SDK's own `ProviderContainer`, never directly.
+/// [PosConfig] is the single object a host builds and passes to
+/// `CashupPos.initialize`. It never reaches past the seams the package
+/// already defines: [PosPaymentHandler] / [QrisGateway] (Task 15) are the
+/// host's own implementations, and nothing here talks to [PosRepository] or
+/// `PosApiClient` directly — those are constructed from [baseUrl] /
+/// [tokenProvider] / [extraHeaders] later, once `pos_providers.dart`
+/// (Task 20) exists.
 library;
 
-import 'dart:ui' show Locale;
+import 'package:flutter/widgets.dart' show Locale;
 
-import '../data/pos_repository.dart';
 import '../models/transaction_details.dart';
 import '../payment/pos_payment_handler.dart';
 import '../payment/qris_gateway.dart';
 import 'pos_theme.dart';
 
-/// Branding shown on receipts and the POS shell — the Dart counterpart of
-/// the Kotlin merchant profile fields the tablet UI renders in its header
-/// and on printed/shared receipts.
+/// Merchant identity shown on receipts and the POS chrome.
 class PosMerchant {
-  /// Creates a merchant profile.
   const PosMerchant({
     required this.name,
     this.address,
@@ -28,23 +25,19 @@ class PosMerchant {
     this.logoAssetPath,
   });
 
-  /// The merchant's display name.
   final String name;
-
-  /// First address line, if any.
   final String? address;
-
-  /// Second address line, if any.
   final String? address2;
 
-  /// Asset path (host bundle) for the merchant's logo, if any.
+  /// An asset path resolved against the *host* app's asset bundle, not the
+  /// SDK's — the SDK never ships merchant logos.
   final String? logoAssetPath;
 }
 
-/// Toggles for optional SDK surfaces, so a host can embed only the parts of
-/// the POS it needs. All default to enabled.
+/// Toggles for optional POS capabilities. Every flag defaults to enabled;
+/// a host narrows the surface by turning individual flags off rather than
+/// the SDK opting features in piecemeal.
 class PosFeatureFlags {
-  /// Creates a set of feature flags. Every flag defaults to enabled.
   const PosFeatureFlags({
     this.enableProductManagement = true,
     this.enableCategoryManagement = true,
@@ -54,45 +47,22 @@ class PosFeatureFlags {
     this.enableSimpleMode = true,
   });
 
-  /// Whether the product catalogue can be created/edited from within the SDK.
   final bool enableProductManagement;
-
-  /// Whether categories can be created/edited from within the SDK.
   final bool enableCategoryManagement;
-
-  /// Whether stock quantities and stock movement history are shown.
   final bool enableStockTracking;
-
-  /// Whether the sales summary report screen is available.
   final bool enableSummaryReport;
-
-  /// Whether queue numbers are assigned to transactions.
   final bool enableQueueNumber;
-
-  /// Whether the simplified (reduced-step) checkout mode is offered.
   final bool enableSimpleMode;
 }
 
-/// Called once a transaction has been created on the backend, so the host
-/// can react — e.g. print a receipt, update its own order records, or
-/// navigate away from the POS.
-typedef PosTransactionCompletedCallback = void Function(
-  TransactionDetails transaction,
-);
-
-/// Configuration the host supplies to [CashupPos.initialize].
+/// Everything the SDK needs from the host, gathered into one object.
 ///
-/// Everything the SDK needs to talk to the `/pos/*` backend and to present
-/// itself inside a host app lives here: no other entry point for
-/// configuration exists.
+/// Construction never fails and never talks to the network — validation
+/// (e.g. base URL normalisation) happens once, in `CashupPos.initialize`,
+/// so this class stays a plain, immutable data holder.
 class PosConfig {
-  /// Creates a POS configuration.
-  ///
-  /// [baseUrl] is normalised so it always ends with a trailing slash, to
-  /// match the relative paths [PosRepository] and `PosApiClient` build
-  /// requests with.
-  PosConfig({
-    required String baseUrl,
+  const PosConfig({
+    required this.baseUrl,
     required this.tokenProvider,
     required this.merchant,
     this.paymentHandler,
@@ -102,42 +72,37 @@ class PosConfig {
     this.locale = const Locale('id', 'ID'),
     this.extraHeaders,
     this.onTransactionCompleted,
-  }) : baseUrl = baseUrl.endsWith('/') ? baseUrl : '$baseUrl/';
+  });
 
-  /// The `/pos/*` backend's base URL, always normalised to end with `/`.
+  /// The `/pos/*` backend's base URL. `CashupPos.initialize` normalises a
+  /// missing trailing slash onto this before it is exposed via
+  /// `CashupPos.config` or used to build the API client.
   final String baseUrl;
 
-  /// Returns the current bearer token, read fresh on every request. `null`
-  /// when no user is signed in — the request is then sent unauthenticated
-  /// and the backend rejects it.
+  /// Read fresh before every request — see `PosApiClient`'s doc comment for
+  /// why nothing caches the token on the SDK side.
   final Future<String?> Function() tokenProvider;
 
-  /// Branding shown throughout the POS UI and on receipts.
   final PosMerchant merchant;
 
-  /// Handles card/EDC/CDCP payments. `null` if the host offers no such
-  /// methods; the SDK then only offers QRIS and cash.
+  /// Executes card / EDC / CDCP payments. `null` when the host does not
+  /// support any of those methods — the checkout flow then offers only cash
+  /// and (if [qrisGateway] is set) QRIS.
   final PosPaymentHandler? paymentHandler;
 
-  /// Generates and polls QRIS payloads. `null` if the host does not support
-  /// QRIS.
+  /// Generates and polls QRIS payments. `null` when the host does not
+  /// support QRIS.
   final QrisGateway? qrisGateway;
 
-  /// Visual theme tokens. Defaults to [PosTheme.cashup].
   final PosTheme theme;
-
-  /// Which optional SDK surfaces are enabled.
   final PosFeatureFlags features;
-
-  /// Locale for currency, date and number formatting. Defaults to
-  /// Indonesian.
   final Locale locale;
 
-  /// Extra headers merged into every request, e.g. device id or app
-  /// version. Sent as-is on top of the `Authorization` header the SDK
-  /// manages itself.
-  final Map<String, String>? extraHeaders;
+  /// Extra headers merged onto every request, alongside the bearer token —
+  /// the Dart counterpart of the device-id / version-id / user-agent
+  /// headers the Kotlin `PosAuthInterceptor` adds.
+  final Map<String, String> Function()? extraHeaders;
 
-  /// Invoked once a transaction is successfully created on the backend.
-  final PosTransactionCompletedCallback? onTransactionCompleted;
+  /// Notified once a transaction has been created and paid.
+  final void Function(TransactionDetails transaction)? onTransactionCompleted;
 }

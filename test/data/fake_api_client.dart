@@ -1,13 +1,13 @@
 import 'package:cashup_pos/src/data/pos_api_client.dart';
 
-/// Fake [PosApiClient] for repository tests.
+/// A [PosApiClient] test double that records the last call made and returns
+/// a canned envelope keyed by request path.
 ///
-/// Dart's implicit interfaces let this `implement` [PosApiClient] without
-/// providing its private fields or constructor — only the four public
-/// methods need bodies. It records the last call made (path, query, body)
-/// and returns the canned envelope registered for that path, exactly as
-/// [PosApiClient] would after already unwrapping and validating the
-/// response — repository tests don't need to re-exercise that validation.
+/// One canned body per path is enough for [PosRepositoryImpl]'s tests: each
+/// test exercises a single endpoint per repository call. `implements` (not
+/// `extends`) is deliberate — [PosApiClient]'s constructor requires a live
+/// `Dio`, and only its public `get`/`post`/`put`/`delete` surface needs a
+/// fake, which is all `implements` from another library requires.
 class FakeApiClient implements PosApiClient {
   FakeApiClient(this._responses);
 
@@ -19,41 +19,49 @@ class FakeApiClient implements PosApiClient {
   Object? lastBody;
 
   @override
-  Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) {
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
     lastMethod = 'GET';
     lastPath = path;
     lastQuery = query;
-    return _respond(path);
+    lastBody = null;
+    return _responseFor(path);
   }
 
   @override
-  Future<Map<String, dynamic>> post(String path, {Object? body}) {
+  Future<Map<String, dynamic>> post(String path, {Object? body}) async {
     lastMethod = 'POST';
     lastPath = path;
+    lastQuery = null;
     lastBody = body;
-    return _respond(path);
+    return _responseFor(path);
   }
 
   @override
-  Future<Map<String, dynamic>> put(String path, {Object? body}) {
+  Future<Map<String, dynamic>> put(String path, {Object? body}) async {
     lastMethod = 'PUT';
     lastPath = path;
+    lastQuery = null;
     lastBody = body;
-    return _respond(path);
+    return _responseFor(path);
   }
 
   @override
-  Future<Map<String, dynamic>> delete(String path) {
+  Future<Map<String, dynamic>> delete(String path) async {
     lastMethod = 'DELETE';
     lastPath = path;
-    return _respond(path);
+    lastQuery = null;
+    lastBody = null;
+    return _responseFor(path);
   }
 
-  Future<Map<String, dynamic>> _respond(String path) async {
-    final body = _responses[path];
-    if (body == null) {
-      throw StateError('FakeApiClient: no canned response for "$path"');
+  Map<String, dynamic> _responseFor(String path) {
+    final response = _responses[path];
+    if (response == null) {
+      throw StateError('FakeApiClient has no canned response for "$path"');
     }
-    return body;
+    return response;
   }
 }

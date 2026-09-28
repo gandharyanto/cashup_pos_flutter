@@ -1,28 +1,18 @@
-/// A single cart line row: image, name, chosen variant/modifier summary, a
-/// quantity control and the line total. Used by the cart panel on phone
-/// and tablet alike.
-library;
-
 import 'package:flutter/material.dart';
 
-import '../../config/pos_theme.dart';
 import '../../util/currency.dart';
 import 'image_thumb.dart';
 import 'money_text.dart';
 import 'qty_stepper.dart';
 
-// `Color`'s wide-gamut fields aren't const-evaluable, so this is a
-// module-level `final`, built once at load — not `const`, and never
-// rebuilt inside `build`.
-final _spacing = const PosTheme.cashup().spacing;
-
-/// One row of the cart.
+/// A single cart line: photo, name, chosen options, quantity and line
+/// total, with a per-line savings note.
 ///
-/// [onRemove] fires when the quantity stepper is decremented past one
-/// (i.e. to zero) — there is no separate delete affordance, matching the
-/// reference cart, where removal is just stepping a line down to nothing.
+/// The quantity control is a [QtyStepper] when [onQuantityChanged] is
+/// given, and a plain "×N" label otherwise (e.g. a read-only receipt
+/// preview) — this widget holds no quantity state of its own either way,
+/// matching [QtyStepper]'s own contract.
 class CartLineTile extends StatelessWidget {
-  /// Creates a cart line tile.
   const CartLineTile({
     super.key,
     required this.name,
@@ -39,150 +29,127 @@ class CartLineTile extends StatelessWidget {
     this.onTap,
   });
 
-  /// The product name.
   final String name;
-
-  /// The unit price before any per-line promotion.
   final double unitPrice;
-
-  /// The current quantity on this line.
   final int quantity;
-
-  /// The line's total amount, already net of savings, shown right-aligned.
   final double lineTotal;
-
-  /// A short summary of the chosen variant/modifier options, e.g.
-  /// `'Besar, Less Sugar'`.
   final String? optionsSummary;
-
-  /// Amount saved on this line by an applied promotion, if any.
   final double? savingsAmount;
-
-  /// Overrides the default `'Hemat Rp ...'` savings badge text.
   final String? savingsLabel;
-
-  /// The line's product image url, already resolved.
   final String? imageUrl;
-
-  /// Quantity on this line that is free (buy-x-get-y style promotions).
   final int freeQty;
-
-  /// Called with the new quantity when the stepper changes it above zero.
   final ValueChanged<int>? onQuantityChanged;
-
-  /// Called when the stepper is decremented to zero.
   final VoidCallback? onRemove;
-
-  /// Called when the row itself is tapped, e.g. to edit options or add a
-  /// note.
   final VoidCallback? onTap;
+
+  static const double _thumbSize = 56;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasSavings = (savingsAmount ?? 0) > 0;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: _spacing.s),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ImageThumb(
               url: imageUrl,
-              width: 56,
-              height: 56,
-              placeholderIcon: Icons.fastfood_outlined,
+              width: _thumbSize,
+              height: _thumbSize,
+              borderRadius: BorderRadius.circular(8),
             ),
-            SizedBox(width: _spacing.m),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  Text(name, style: theme.textTheme.bodyLarge),
                   if (optionsSummary != null)
                     Text(
                       optionsSummary!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                  if (freeQty > 0)
-                    Text(
-                      '$freeQty gratis',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.tertiary,
-                        fontWeight: FontWeight.w600,
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      MoneyText(
+                        unitPrice,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                  if (hasSavings)
-                    Padding(
-                      padding: EdgeInsets.only(top: _spacing.xs),
-                      child: _SavingsBadge(
-                        savingsLabel ?? 'Hemat ${Money.format(savingsAmount!)}',
+                      Text(
+                        ' × $quantity',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                  SizedBox(height: _spacing.s),
-                  QtyStepper(
-                    value: quantity,
-                    compact: true,
-                    onChanged: (next) {
-                      if (next <= 0) {
-                        onRemove?.call();
-                      } else {
-                        onQuantityChanged?.call(next);
-                      }
-                    },
+                      if (freeQty > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: Text(
+                            '+$freeQty gratis',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.secondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
+                  if (savingsAmount != null && savingsAmount! > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '${savingsLabel ?? 'Hemat'} ${Money.format(savingsAmount!)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.secondary,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
-            SizedBox(width: _spacing.m),
-            MoneyText(
-              lineTotal,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onRemove != null)
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    iconSize: 18,
+                    tooltip: 'Hapus',
+                    onPressed: onRemove,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                const SizedBox(height: 4),
+                MoneyText(
+                  lineTotal,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (onQuantityChanged != null)
+                  QtyStepper(
+                    value: quantity,
+                    onChanged: onQuantityChanged!,
+                    compact: true,
+                    min: 0,
+                  )
+                else
+                  Text('×$quantity', style: theme.textTheme.bodySmall),
+              ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A small pill badge showing the amount saved on a cart line.
-class _SavingsBadge extends StatelessWidget {
-  const _SavingsBadge(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: _spacing.s, vertical: 2),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSecondaryContainer,
-          fontWeight: FontWeight.w600,
         ),
       ),
     );

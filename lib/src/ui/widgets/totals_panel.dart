@@ -1,28 +1,20 @@
-/// A stacked list of [AmountRow]s, used for the cart totals summary, the
-/// receipt breakdown and the checkout confirmation.
-library;
-
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
 import 'amount_row.dart';
 
-/// A vertical stack of [rows], with an optional [footer] below them (e.g. a
-/// "bayar sekarang" button on the checkout confirmation).
+/// A stack of [AmountRow]s (subtotal, discount, tax, total, ...) with an
+/// optional footer widget below the last row (e.g. a payment method note).
 class TotalsPanel extends StatelessWidget {
-  /// Creates a totals panel.
   const TotalsPanel({super.key, required this.rows, this.footer});
 
-  /// The amount rows, top to bottom.
   final List<AmountRow> rows;
-
-  /// Optional content rendered below [rows].
   final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [...rows, ?footer],
     );
   }
