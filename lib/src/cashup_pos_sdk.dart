@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/pos_config.dart';
+import 'state/pos_providers.dart';
 
 /// Holds the SDK's configuration and its private Riverpod container for the
 /// lifetime of the host's use of the POS.
@@ -35,7 +36,9 @@ class CashupPos {
   static Future<void> initialize(PosConfig config) async {
     _container?.dispose();
     _config = config;
-    _container = ProviderContainer();
+    _container = ProviderContainer(
+      overrides: [posConfigProvider.overrideWithValue(config)],
+    );
   }
 
   /// Whether [initialize] has been called and [dispose] has not since.
