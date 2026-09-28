@@ -7,59 +7,51 @@ import '../util/num_utils.dart';
 /// which describes the single merchant a host app is configured against
 /// (name/address/logo for display), not a listing row.
 ///
-/// **Placeholder contract.** No merchant-listing endpoint exists in the
-/// pinned Kotlin source this package ports from
+/// **Placeholder path, confirmed item shape.** No merchant-listing endpoint
+/// exists in the pinned Kotlin source this package ports from
 /// (`origin/feature/pos-asg-phase3` @
-/// `33ddffdcc50aa8f9c6c53344bb4b269de5733064`) — this shape was designed for
-/// a user-requested addition with no real backend contract to match yet.
-/// Check the current backend before relying on the field names here.
+/// `33ddffdcc50aa8f9c6c53344bb4b269de5733064`) — this was designed for a
+/// user-requested addition with no real backend contract to match yet, so
+/// the endpoint *paths* are still placeholders. The item *shape* below,
+/// though, is taken verbatim from a real sample response the user supplied:
+/// `{"value": 16461, "label": "Misoa Nai Nai (TOKYO WET)"}`. The wire sends
+/// no `address`, `logoUrl` or separate area id/name — [name] and [areaName]
+/// below are derived from [label] rather than carried as their own fields.
 class PosMerchantSummary {
-  const PosMerchantSummary({
-    required this.id,
-    required this.name,
-    this.address,
-    this.areaId,
-    this.areaName,
-    this.logoUrl,
-  });
+  const PosMerchantSummary({required this.id, required this.label});
 
   final int id;
-  final String name;
-  final String? address;
-  final int? areaId;
-  final String? areaName;
-  final String? logoUrl;
+
+  /// The wire's label verbatim, e.g. "Misoa Nai Nai (TOKYO WET)".
+  final String label;
+
+  static final _labelPattern = RegExp(r'^(.*)\s\(([^)]+)\)$');
+
+  /// The merchant name with a trailing " (Area)" suffix stripped, when
+  /// present. Falls back to the full [label] when the pattern doesn't match
+  /// (no parenthesized suffix on the wire).
+  String get name {
+    final match = _labelPattern.firstMatch(label);
+    return match?.group(1) ?? label;
+  }
+
+  /// The area name parsed from a trailing "(Area)" suffix, or `null` when
+  /// [label] carries none.
+  String? get areaName => _labelPattern.firstMatch(label)?.group(2);
 
   factory PosMerchantSummary.fromJson(Map<String, dynamic> json) =>
       PosMerchantSummary(
-        id: asInt(json['id']) ?? 0,
-        name: json['name'] as String? ?? '',
-        address: json['address'] as String?,
-        areaId: asInt(json['areaId']),
-        areaName: json['areaName'] as String?,
-        logoUrl: json['logoUrl'] as String?,
+        id: asInt(json['value']) ?? 0,
+        label: json['label'] as String? ?? '',
       );
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'address': address,
-    'areaId': areaId,
-    'areaName': areaName,
-    'logoUrl': logoUrl,
-  };
+  Map<String, dynamic> toJson() => {'id': id, 'label': label};
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PosMerchantSummary &&
-          other.id == id &&
-          other.name == name &&
-          other.address == address &&
-          other.areaId == areaId &&
-          other.areaName == areaName &&
-          other.logoUrl == logoUrl;
+      other is PosMerchantSummary && other.id == id && other.label == label;
 
   @override
-  int get hashCode => Object.hash(id, name, address, areaId, areaName, logoUrl);
+  int get hashCode => Object.hash(id, label);
 }

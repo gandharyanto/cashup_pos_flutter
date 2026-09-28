@@ -19,6 +19,7 @@ import '../models/paged_result.dart';
 import '../models/payment_setting.dart';
 import '../models/pos_area.dart';
 import '../models/pos_category.dart';
+import '../models/pos_lookup_page.dart';
 import '../models/pos_merchant_summary.dart';
 import '../models/pos_payment_method.dart';
 import '../models/pos_product.dart';
@@ -91,19 +92,21 @@ abstract class PosRepository {
   Future<List<DiscountItem>> discountList();
   Future<List<PromotionItem>> activePromotions();
 
-  // ── Area & merchant directory (placeholder contract) ────────────────────
+  // ── Area & merchant directory (placeholder paths, confirmed item shape) ──
   //
   // No such endpoint exists anywhere in the pinned Kotlin source this
   // package ports from — see the doc comments on [PosRepositoryImpl]'s
   // implementations for details. Designed to be swappable with no ripple
-  // beyond this layer once a real backend contract exists.
+  // beyond this layer once the paths are confirmed. The response envelope
+  // (`PosLookupPage`) is taken from a real backend sample, distinct from
+  // the rest of `/pos/*`'s `PagedResult` envelope — see that class's doc.
 
-  Future<PagedResult<PosArea>> areaList({int size = 100, String? keyword});
-  Future<PagedResult<PosMerchantSummary>> merchantList({
+  Future<PosLookupPage<PosArea>> areaList({int size = 100, String? keyword});
+  Future<PosLookupPage<PosMerchantSummary>> merchantList({
     int size = 100,
     String? keyword,
   });
-  Future<PagedResult<PosMerchantSummary>> merchantsByArea({
+  Future<PosLookupPage<PosMerchantSummary>> merchantsByArea({
     required int areaId,
     int size = 100,
     String? keyword,

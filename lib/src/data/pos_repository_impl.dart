@@ -15,6 +15,7 @@ import '../models/paged_result.dart';
 import '../models/payment_setting.dart';
 import '../models/pos_area.dart';
 import '../models/pos_category.dart';
+import '../models/pos_lookup_page.dart';
 import '../models/pos_merchant_summary.dart';
 import '../models/pos_payment_method.dart';
 import '../models/pos_product.dart';
@@ -347,42 +348,52 @@ class PosRepositoryImpl implements PosRepository {
     return PromotionItem.listFromJson(json['data']);
   }
 
-  // ── Area & merchant directory (placeholder contract) ────────────────────
+  // ── Area & merchant directory (placeholder paths, confirmed item shape) ──
 
   @override
-  Future<PagedResult<PosArea>> areaList({
+  Future<PosLookupPage<PosArea>> areaList({
     int size = 100,
     String? keyword,
   }) async {
     // Placeholder path: no `area list` endpoint exists anywhere in the
     // pinned Kotlin source this package ports from — see
     // `PosRepository`'s "Area & merchant directory" section. Confirm this
-    // path against the real backend contract before relying on it.
+    // path against the real backend contract before relying on it. The
+    // response envelope itself is the user-confirmed real shape — see
+    // `PosLookupPage`.
     final json = await _api.get(
       'pos/area/list',
       query: {'size': size, 'keyword': ?keyword},
     );
-    return PagedResult.fromJson(json, PosArea.fromJson);
+    return PosLookupPage.fromJson(
+      _requireLookupSuccess(json, 'areas'),
+      PosArea.fromJson,
+    );
   }
 
   @override
-  Future<PagedResult<PosMerchantSummary>> merchantList({
+  Future<PosLookupPage<PosMerchantSummary>> merchantList({
     int size = 100,
     String? keyword,
   }) async {
     // Placeholder path: no `merchant list` endpoint exists anywhere in the
     // pinned Kotlin source this package ports from — see
     // `PosRepository`'s "Area & merchant directory" section. Confirm this
-    // path against the real backend contract before relying on it.
+    // path against the real backend contract before relying on it. The
+    // response envelope itself is the user-confirmed real shape — see
+    // `PosLookupPage`.
     final json = await _api.get(
       'pos/merchant/list',
       query: {'size': size, 'keyword': ?keyword},
     );
-    return PagedResult.fromJson(json, PosMerchantSummary.fromJson);
+    return PosLookupPage.fromJson(
+      _requireLookupSuccess(json, 'merchants'),
+      PosMerchantSummary.fromJson,
+    );
   }
 
   @override
-  Future<PagedResult<PosMerchantSummary>> merchantsByArea({
+  Future<PosLookupPage<PosMerchantSummary>> merchantsByArea({
     required int areaId,
     int size = 100,
     String? keyword,
@@ -390,12 +401,17 @@ class PosRepositoryImpl implements PosRepository {
     // Placeholder path: no `merchant by area` endpoint exists anywhere in
     // the pinned Kotlin source this package ports from — see
     // `PosRepository`'s "Area & merchant directory" section. Confirm this
-    // path against the real backend contract before relying on it.
+    // path against the real backend contract before relying on it. The
+    // response envelope itself is the user-confirmed real shape — see
+    // `PosLookupPage`.
     final json = await _api.get(
       'pos/merchant/area/list',
       query: {'areaId': areaId, 'size': size, 'keyword': ?keyword},
     );
-    return PagedResult.fromJson(json, PosMerchantSummary.fromJson);
+    return PosLookupPage.fromJson(
+      _requireLookupSuccess(json, 'merchants'),
+      PosMerchantSummary.fromJson,
+    );
   }
 
   // ── Shared ────────────────────────────────────────────────────────────
@@ -411,5 +427,28 @@ class PosRepositoryImpl implements PosRepository {
       );
     }
     return Map<String, dynamic>.from(data);
+  }
+
+  /// Guards the area/merchant lookup family's own `success: true/false`
+  /// field.
+  ///
+  /// [PosApiClient]'s shared success predicate reads `response_code` /
+  /// `code` / `responseCode`, none of which this envelope carries, so it
+  /// silently falls back to the HTTP status code and never inspects this
+  /// body's `success` field. That fallback is correct for every other
+  /// `/pos/*` endpoint but blind to a business-level failure reported here,
+  /// so this repository-layer guard checks it explicitly before handing the
+  /// envelope to [PosLookupPage.fromJson].
+  Map<String, dynamic> _requireLookupSuccess(
+    Map<String, dynamic> json,
+    String what,
+  ) {
+    if (json['success'] != true) {
+      throw PosException(
+        kind: PosErrorKind.unknown,
+        message: json['message']?.toString() ?? 'Failed to load $what',
+      );
+    }
+    return json;
   }
 }
