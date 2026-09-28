@@ -110,6 +110,11 @@ class CatalogController extends AsyncNotifier<CatalogState> {
     final repository = ref.read(posRepositoryProvider);
     final productsFuture = repository.productList();
     final categoriesFuture = repository.categoryList();
+    // Both requests run in parallel. Awaiting them one after the other
+    // would leave the second future unobserved when the first throws (e.g.
+    // offline, where both fail), so its error would escape as an unhandled
+    // async error. `Future.wait` observes both and rethrows the first.
+    await Future.wait<Object>([productsFuture, categoriesFuture]);
     final productsResult = await productsFuture;
     final categoriesResult = await categoriesFuture;
     return CatalogState(
