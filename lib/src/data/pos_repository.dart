@@ -17,7 +17,9 @@ import '../models/discount_item.dart';
 import '../models/option_group.dart';
 import '../models/paged_result.dart';
 import '../models/payment_setting.dart';
+import '../models/pos_area.dart';
 import '../models/pos_category.dart';
+import '../models/pos_merchant_summary.dart';
 import '../models/pos_payment_method.dart';
 import '../models/pos_product.dart';
 import '../models/promotion_item.dart';
@@ -88,6 +90,24 @@ abstract class PosRepository {
   });
   Future<List<DiscountItem>> discountList();
   Future<List<PromotionItem>> activePromotions();
+
+  // ── Area & merchant directory (placeholder contract) ────────────────────
+  //
+  // No such endpoint exists anywhere in the pinned Kotlin source this
+  // package ports from — see the doc comments on [PosRepositoryImpl]'s
+  // implementations for details. Designed to be swappable with no ripple
+  // beyond this layer once a real backend contract exists.
+
+  Future<PagedResult<PosArea>> areaList({int size = 100, String? keyword});
+  Future<PagedResult<PosMerchantSummary>> merchantList({
+    int size = 100,
+    String? keyword,
+  });
+  Future<PagedResult<PosMerchantSummary>> merchantsByArea({
+    required int areaId,
+    int size = 100,
+    String? keyword,
+  });
 }
 
 /// The `pos/product/add` / `pos/product/update` payload.

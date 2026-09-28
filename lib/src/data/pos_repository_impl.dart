@@ -13,7 +13,9 @@ import '../models/discount_item.dart';
 import '../models/option_group.dart';
 import '../models/paged_result.dart';
 import '../models/payment_setting.dart';
+import '../models/pos_area.dart';
 import '../models/pos_category.dart';
+import '../models/pos_merchant_summary.dart';
 import '../models/pos_payment_method.dart';
 import '../models/pos_product.dart';
 import '../models/promotion_item.dart';
@@ -343,6 +345,57 @@ class PosRepositoryImpl implements PosRepository {
   Future<List<PromotionItem>> activePromotions() async {
     final json = await _api.get('pos/promotion/active');
     return PromotionItem.listFromJson(json['data']);
+  }
+
+  // ── Area & merchant directory (placeholder contract) ────────────────────
+
+  @override
+  Future<PagedResult<PosArea>> areaList({
+    int size = 100,
+    String? keyword,
+  }) async {
+    // Placeholder path: no `area list` endpoint exists anywhere in the
+    // pinned Kotlin source this package ports from — see
+    // `PosRepository`'s "Area & merchant directory" section. Confirm this
+    // path against the real backend contract before relying on it.
+    final json = await _api.get(
+      'pos/area/list',
+      query: {'size': size, 'keyword': ?keyword},
+    );
+    return PagedResult.fromJson(json, PosArea.fromJson);
+  }
+
+  @override
+  Future<PagedResult<PosMerchantSummary>> merchantList({
+    int size = 100,
+    String? keyword,
+  }) async {
+    // Placeholder path: no `merchant list` endpoint exists anywhere in the
+    // pinned Kotlin source this package ports from — see
+    // `PosRepository`'s "Area & merchant directory" section. Confirm this
+    // path against the real backend contract before relying on it.
+    final json = await _api.get(
+      'pos/merchant/list',
+      query: {'size': size, 'keyword': ?keyword},
+    );
+    return PagedResult.fromJson(json, PosMerchantSummary.fromJson);
+  }
+
+  @override
+  Future<PagedResult<PosMerchantSummary>> merchantsByArea({
+    required int areaId,
+    int size = 100,
+    String? keyword,
+  }) async {
+    // Placeholder path: no `merchant by area` endpoint exists anywhere in
+    // the pinned Kotlin source this package ports from — see
+    // `PosRepository`'s "Area & merchant directory" section. Confirm this
+    // path against the real backend contract before relying on it.
+    final json = await _api.get(
+      'pos/merchant/area/list',
+      query: {'areaId': areaId, 'size': size, 'keyword': ?keyword},
+    );
+    return PagedResult.fromJson(json, PosMerchantSummary.fromJson);
   }
 
   // ── Shared ────────────────────────────────────────────────────────────
