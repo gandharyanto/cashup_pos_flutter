@@ -10,9 +10,12 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/discount_item.dart';
 import '../models/option_group.dart';
+import '../models/payment_setting.dart';
 import '../models/pos_category.dart';
 import '../models/pos_product.dart';
+import '../models/promotion_item.dart';
 import 'pos_providers.dart';
 
 /// The catalogue's loaded data plus in-memory filter/layout state.
@@ -134,3 +137,26 @@ class CatalogController extends AsyncNotifier<CatalogState> {
     return ref.read(posRepositoryProvider).productOptionGroups(productId);
   }
 }
+
+/// The catalogue: products, categories, and their in-memory filter/layout
+/// state.
+final catalogControllerProvider =
+    AsyncNotifierProvider<CatalogController, CatalogState>(
+      CatalogController.new,
+    );
+
+/// The merchant's payment setting (tax/rounding/service charge), or `null`
+/// if none has been configured yet.
+final paymentSettingProvider = FutureProvider<PaymentSetting?>(
+  (ref) => ref.watch(posRepositoryProvider).paymentSetting(),
+);
+
+/// Discounts currently available to apply at checkout.
+final activeDiscountsProvider = FutureProvider<List<DiscountItem>>(
+  (ref) => ref.watch(posRepositoryProvider).discountList(),
+);
+
+/// Promotions currently active for this merchant.
+final activePromotionsProvider = FutureProvider<List<PromotionItem>>(
+  (ref) => ref.watch(posRepositoryProvider).activePromotions(),
+);

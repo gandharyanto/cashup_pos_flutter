@@ -1,3 +1,4 @@
+import 'package:cashup_pos/src/state/catalog_controller.dart';
 import 'package:cashup_pos/src/state/pos_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
