@@ -61,8 +61,11 @@ class PagedListView<T> extends StatefulWidget {
   /// Called when the retry button in the error footer is tapped.
   final VoidCallback? onRetry;
 
-  /// Fixed row height. When set, passed straight to `ListView.builder` for
-  /// a scroll-offset-cheap list; also used to size the load-more threshold.
+  /// Fixed row height for a scroll-offset-cheap, `SliverFixedExtentList`-
+  /// backed list; also used to size the load-more threshold. Ignored for
+  /// sliver layout (falls back to natural sizing) when [separator] is also
+  /// set — a separator's height is arbitrary and can't be safely baked into
+  /// a single fixed slot alongside the row without measuring it.
   final double? itemExtent;
 
   /// Optional separator rendered between rows (not after the last one).
@@ -136,28 +139,84 @@ class _PagedListViewState<T> extends State<PagedListView<T>> {
       return widget.emptyPlaceholder ?? const SizedBox.shrink();
     }
 
-    Widget list = ListView.builder(
-      controller: _controller,
-      padding: widget.padding,
-      itemExtent: widget.itemExtent,
-      itemCount: widget.items.length + (_hasFooter ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index >= widget.items.length) {
-          return _Footer(error: widget.error, onRetry: widget.onRetry);
-        }
-        final row = widget.itemBuilder(context, widget.items[index], index);
-        if (widget.separator == null || index == widget.items.length - 1) {
-          return row;
-        }
-        return Column(children: [row, widget.separator!]);
-      },
-    );
+    final hasFooter = _hasFooter;
+    final hasSeparator = widget.separator != null;
+    // See the [PagedListView.itemExtent] doc: not honoured for sliver
+    // layout once a separator is in play.
+    final fixedExtent = hasSeparator ? null : widget.itemExtent;
+
+    Widget list;
+    if (fixedExtent != null && !hasFooter) {
+      // Fast path: identical to a plain `ListView.builder` — every child is
+      // a uniform-height row with nothing else sharing its slot, so a
+      // single `SliverFixedExtentList` is safe.
+      list = ListView.builder(
+        controller: _controller,
+        padding: widget.padding,
+        itemExtent: fixedExtent,
+        itemCount: widget.items.length,
+        itemBuilder: (context, index) =>
+            widget.itemBuilder(context, widget.items[index], index),
+      );
+    } else {
+      // General path. The footer (natural height: text, a spinner, a retry
+      // button) is a separate sliver appended after the items — never
+      // forced into an item's fixed slot, regardless of whether the items
+      // themselves use a fixed extent.
+      list = CustomScrollView(
+        controller: _controller,
+        slivers: [
+          SliverPadding(
+            padding: widget.padding ?? EdgeInsets.zero,
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                _itemsSliver(fixedExtent, hasSeparator),
+                if (hasFooter)
+                  SliverToBoxAdapter(
+                    child: _Footer(
+                      error: widget.error,
+                      onRetry: widget.onRetry,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
     final onRefresh = widget.onRefresh;
     if (onRefresh != null) {
       list = RefreshIndicator(onRefresh: onRefresh, child: list);
     }
     return list;
+  }
+
+  Widget _itemsSliver(double? fixedExtent, bool hasSeparator) {
+    Widget buildRow(BuildContext context, int index) {
+      final row = widget.itemBuilder(context, widget.items[index], index);
+      if (!hasSeparator || index == widget.items.length - 1) return row;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [row, widget.separator!],
+      );
+    }
+
+    if (fixedExtent != null) {
+      return SliverFixedExtentList(
+        itemExtent: fixedExtent,
+        delegate: SliverChildBuilderDelegate(
+          buildRow,
+          childCount: widget.items.length,
+        ),
+      );
+    }
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        buildRow,
+        childCount: widget.items.length,
+      ),
+    );
   }
 }
 
