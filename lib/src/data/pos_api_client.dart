@@ -198,8 +198,13 @@ class PosApiClient {
     final statusCode = error.response?.statusCode;
     final body = error.response?.data;
     final backendMessage = body is Map ? body['message']?.toString() : null;
+    // Same precedence as the success path (_decodeSuccess): `response_code`,
+    // then `code`, then `responseCode`. `status` is a distinct field
+    // GeneralResponse never consults — see _decodeSuccess's doc comment.
     final backendCode = body is Map
-        ? (body['status']?.toString() ?? body['code']?.toString())
+        ? (body['response_code']?.toString() ??
+              body['code']?.toString() ??
+              body['responseCode']?.toString())
         : null;
     final message = backendMessage ?? error.message ?? 'Request failed';
 

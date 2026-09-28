@@ -4,7 +4,10 @@ import 'package:cashup_pos/src/models/discount_item.dart';
 import 'package:cashup_pos/src/models/option_group.dart';
 import 'package:cashup_pos/src/models/paged_result.dart';
 import 'package:cashup_pos/src/models/payment_setting.dart';
+import 'package:cashup_pos/src/models/pos_area.dart';
 import 'package:cashup_pos/src/models/pos_category.dart';
+import 'package:cashup_pos/src/models/pos_lookup_page.dart';
+import 'package:cashup_pos/src/models/pos_merchant_summary.dart';
 import 'package:cashup_pos/src/models/pos_payment_method.dart';
 import 'package:cashup_pos/src/models/pos_product.dart';
 import 'package:cashup_pos/src/models/promotion_item.dart';
@@ -260,4 +263,21 @@ class FakeRepository implements PosRepository {
     activePromotionsCalls++;
     return activePromotionsResult;
   }
+
+  @override
+  Future<PosLookupPage<PosArea>> areaList({int size = 100, String? keyword}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PosLookupPage<PosMerchantSummary>> merchantList({
+    int size = 100,
+    String? keyword,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<PosLookupPage<PosMerchantSummary>> merchantsByArea({
+    required int areaId,
+    int size = 100,
+    String? keyword,
+  }) => throw UnimplementedError();
 }
