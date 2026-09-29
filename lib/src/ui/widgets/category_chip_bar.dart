@@ -25,7 +25,7 @@ class CategoryChipBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 40,
+      height: 38,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: categories.length + 1,
@@ -36,6 +36,11 @@ class CategoryChipBar extends StatelessWidget {
               label: Text(allLabel),
               selected: selectedId == null,
               onSelected: (_) => onSelected(null),
+              showCheckmark: false,
+              selectedColor: Theme.of(context).colorScheme.primary,
+              labelStyle: _labelStyle(context, selectedId == null),
+              side: _side(context, selectedId == null),
+              shape: const StadiumBorder(),
             );
           }
           final category = categories[index - 1];
@@ -43,9 +48,28 @@ class CategoryChipBar extends StatelessWidget {
             label: Text(category.name),
             selected: selectedId == category.id,
             onSelected: (_) => onSelected(category.id),
+            showCheckmark: false,
+            selectedColor: Theme.of(context).colorScheme.primary,
+            labelStyle: _labelStyle(context, selectedId == category.id),
+            side: _side(context, selectedId == category.id),
+            shape: const StadiumBorder(),
           );
         },
       ),
     );
   }
+
+  TextStyle? _labelStyle(BuildContext context, bool selected) =>
+      Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: selected
+            ? Theme.of(context).colorScheme.onPrimary
+            : Theme.of(context).colorScheme.onSurface,
+        fontWeight: FontWeight.w700,
+      );
+
+  BorderSide _side(BuildContext context, bool selected) => BorderSide(
+    color: selected
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.outlineVariant,
+  );
 }

@@ -10,8 +10,9 @@ it. The UI copy is Indonesian. The package is a port of the shipping Kotlin
 Cashup POS and talks to the same `/pos/*` backend, which re-computes every
 amount and rejects any that don't match.
 
-The host app supplies configuration, authentication and payment hardware.
-The SDK handles the rest.
+The SDK owns the complete application UI, including its `MaterialApp`, theme,
+navigator and every POS route. The example host only initializes the SDK,
+supplies colour tokens and runs `CashupPosApp`.
 
 ## Installation
 
@@ -49,33 +50,41 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await CashupPos.initialize(
-    PosConfig(
-      baseUrl: 'https://api.your-backend.example/',
-      tokenProvider: () async => session.accessToken,
-      merchant: const PosMerchant(name: 'Toko Saya'),
-      paymentHandler: MyCardPaymentHandler(),
-      qrisGateway: MyQrisGateway(),
+    bannerImageUrls: const [
+      'https://cdn.example.com/pos/banner-1.jpg',
+      'https://cdn.example.com/pos/banner-2.jpg',
+    ],
+    theme: const PosTheme(
+      shellBackground: Color(0xFF212B52),
+      surface: Color(0xFFFFFFFF),
+      surfaceSoft: Color(0xFFF8FAFC),
+      textOnShell: Color(0xFFFFFFFF),
+      textPrimary: Color(0xFF0F172A),
+      textSecondary: Color(0xFF475569),
+      strokeSoft: Color(0xFFE2E8F0),
+      accentSuccess: Color(0xFF10B981),
     ),
   );
 
-  runApp(const MyApp());
+  runApp(const CashupPosApp());
 }
-
-// Anywhere in the host UI:
-ElevatedButton(
-  onPressed: () => CashupPosLauncher.open(context),
-  child: const Text('Buka POS'),
-);
 ```
 
-`example/` contains a runnable host app that does exactly this, with a demo
-card handler and a demo QRIS gateway. See [Example app](#example-app).
+`CashupPos.initialize` reads optional `CASHUP_POS_BASE_URL` and
+`CASHUP_POS_TOKEN` dart-defines. Its demo merchant and payment adapters live
+inside the SDK, not in the example. See [Example app](#example-app).
+
+For a production host that owns authentication or payment hardware, use
+`CashupPos.initializeWithConfig(PosConfig(...))`; the UI still remains fully
+inside `CashupPosApp`.
 
 ## `CashupPos` and `CashupPosLauncher`
 
 | API | What it does |
 | --- | --- |
-| `CashupPos.initialize(PosConfig)` | Stores the config and creates the SDK's provider container. Calling it again disposes the previous container first. This resets all SDK state, including the cart, so use it to switch merchant accounts. |
+| `CashupPos.initialize(theme: ..., bannerImageUrls: ...)` | Creates the SDK using its self-contained defaults. The host can supply its colour theme and ordered catalogue banner URLs. |
+| `CashupPos.initializeWithConfig(PosConfig)` | Advanced production setup for a custom backend, auth, merchant and payment adapters. Re-initializing resets SDK state, including the cart. |
+| `CashupPosApp` | SDK-owned application root containing the theme, provider scope, navigator and initial POS screen. |
 | `CashupPos.dispose()` | Tears the container down and clears the config (for example, on sign-out). Safe to call at any time. |
 | `CashupPos.isInitialized` | Whether `initialize` has run and `dispose` hasn't. |
 | `CashupPos.config` | The active config, with `baseUrl` normalised to end in `/`. Throws before `initialize`. |
@@ -84,15 +93,18 @@ card handler and a demo QRIS gateway. See [Example app](#example-app).
 | `CashupPosLauncher.openProductManagement(context)` | Pushes product management. |
 | `CashupPosLauncher.openSettings(context)` | Pushes payment settings. |
 
-Every launcher method pushes onto the **host's** `Navigator` and throws a
+The launcher methods remain available for embedding individual routes in a
+larger host application. Every launcher method pushes onto the host's
+`Navigator` and throws a
 `StateError` if the SDK isn't initialized. Each pushed route is themed from
 `PosConfig.theme`. It follows the host's current brightness, taken from
 `Theme.of(context)` at push time.
 
 ## `PosConfig`
 
-`PosConfig` is an immutable data holder. Building one never fails and never
-touches the network.
+`PosConfig` is the advanced integration object passed to
+`CashupPos.initializeWithConfig`. Building one never fails and never touches
+the network.
 
 | Field | Required | Meaning |
 | --- | --- | --- |
@@ -216,9 +228,8 @@ const PosTheme(
 ```
 
 `PosTheme.cashup()` is the stock Cashup palette.
-`theme.toThemeData(brightness)` builds the Material 3 `ThemeData` that every
-SDK route is wrapped in. A host can also use it for its own screens so the
-two match; the example app does this.
+`theme.toThemeData(brightness)` builds the Material 3 `ThemeData` used by the
+SDK-owned `MaterialApp` and its routes.
 
 ## Feature flags
 
@@ -280,12 +291,10 @@ flutter run -d <device-id> \
   --dart-define=CASHUP_POS_TOKEN=<jwt>
 ```
 
-The base URL and token can also be typed into the demo home screen. The demo
-simulates card and QRIS payments. `DemoPaymentHandler` approves every card
-payment after 2 seconds. `DemoQrisGateway` shows a fixed QR code and
-reports `paid` on the third status check. The catalogue, cart pricing and
-transaction creation still need a reachable `/pos/*` backend. Without one,
-the POS shell opens and shows the offline error state described above.
+The example contains no host-owned screen. It supplies only `PosTheme`, calls
+`CashupPos.initialize`, and runs `CashupPosApp`. The SDK's built-in demo card
+and QRIS adapters keep the payment UI exercisable; catalogue and transaction
+operations still need a reachable `/pos/*` backend.
 
 Android builds need `JAVA_HOME` pointing at JDK 17.
 

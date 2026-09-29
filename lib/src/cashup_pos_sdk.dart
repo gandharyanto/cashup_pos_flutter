@@ -1,19 +1,19 @@
-/// The SDK's public entry point: [CashupPos] holds the host's
-/// [PosConfig] and the Riverpod [ProviderContainer] every SDK-internal
-/// widget reads from, and [CashupPosLauncher] is how a host pushes the POS
-/// UI onto its own [Navigator].
+/// Public SDK lifecycle and UI entry points.
 ///
-/// Nothing under `state/` or `ui/` exists yet (Tasks 17+), so the launcher
-/// methods below push a placeholder page rather than a real one — see each
-/// method's doc comment. Task 23 replaces `open`'s body with the real
-/// entry page; `openTransactions` / `openProductManagement` /
-/// `openSettings` are replaced by their own later tasks.
+/// [CashupPosApp] is the preferred self-contained root: the SDK owns its
+/// `MaterialApp`, theme, navigator, provider scope and every POS screen.
+/// [CashupPosLauncher] remains available for hosts that embed POS routes in
+/// a larger application.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/pos_config.dart';
+import 'config/pos_theme.dart';
+import 'payment/payment_result.dart';
+import 'payment/pos_payment_handler.dart';
+import 'payment/qris_gateway.dart';
 import 'state/pos_providers.dart';
 import 'ui/pages/manage_product_page.dart';
 import 'ui/pages/payment_setting_page.dart';
@@ -24,9 +24,9 @@ import 'ui/pages/transaction_list_page.dart';
 /// [ProviderContainer] every SDK screen reads from via
 /// `UncontrolledProviderScope`.
 ///
-/// A host calls [initialize] once (typically in `main()`, before the app
-/// that hosts the POS button is shown) and [dispose] when the SDK is no
-/// longer needed (e.g. on sign-out).
+/// A host calls [initialize] once for the self-contained setup, or
+/// [initializeWithConfig] for production backend/auth/payment integration.
+/// Call [dispose] when the SDK is no longer needed.
 class CashupPos {
   CashupPos._();
 
@@ -36,8 +36,8 @@ class CashupPos {
   /// Whether [initialize] has completed and not yet been [dispose]d.
   static bool get isInitialized => _config != null;
 
-  /// The active configuration, as passed to [initialize] — with [baseUrl]
-  /// normalised to always carry a trailing slash.
+  /// The active configuration, with [baseUrl] normalised to always carry a
+  /// trailing slash.
   ///
   /// Throws a [StateError] when read before [initialize].
   static PosConfig get config {
@@ -68,6 +68,33 @@ class CashupPos {
     return container;
   }
 
+  /// Initializes the self-contained POS with SDK-owned demo defaults.
+  ///
+  /// The host only supplies colour tokens. Build-time
+  /// `CASHUP_POS_BASE_URL` and `CASHUP_POS_TOKEN` values are used when
+  /// present.
+  static Future<void> initialize({
+    PosTheme theme = const PosTheme.cashup(),
+    List<String> bannerImageUrls = const [],
+  }) => initializeWithConfig(
+    PosConfig(
+      baseUrl: const String.fromEnvironment(
+        'CASHUP_POS_BASE_URL',
+        defaultValue: 'https://tucanos-orca-pos.cashup.id/',
+      ),
+      tokenProvider: _defaultTokenProvider,
+      merchant: const PosMerchant(
+        name: 'Toko Demo Cashup',
+        address: 'Jl. Contoh No. 1',
+        address2: 'Jakarta',
+      ),
+      paymentHandler: const _SdkDemoPaymentHandler(),
+      qrisGateway: _SdkDemoQrisGateway(),
+      theme: theme,
+      bannerImageUrls: bannerImageUrls,
+    ),
+  );
+
   /// Stores [config] (normalising [PosConfig.baseUrl]) and creates a fresh
   /// [ProviderContainer]. Calling this again while already initialized
   /// disposes the previous container first, so a host that re-initializes
@@ -76,7 +103,7 @@ class CashupPos {
   /// The container overrides `posConfigProvider` with the normalized
   /// config — every other provider in `pos_providers.dart` derives from it,
   /// so nothing else needs to be wired here.
-  static Future<void> initialize(PosConfig config) async {
+  static Future<void> initializeWithConfig(PosConfig config) async {
     _container?.dispose();
 
     final baseUrl = config.baseUrl.endsWith('/')
@@ -93,13 +120,19 @@ class CashupPos {
             theme: config.theme,
             features: config.features,
             locale: config.locale,
+            bannerImageUrls: config.bannerImageUrls,
             extraHeaders: config.extraHeaders,
             onTransactionCompleted: config.onTransactionCompleted,
           );
 
     _config = normalized;
     _container = ProviderContainer(
-      overrides: [posConfigProvider.overrideWithValue(normalized)],
+      overrides: [
+        posConfigProvider.overrideWithValue(normalized),
+        posBannerImageUrlsProvider.overrideWithValue(
+          List.unmodifiable(normalized.bannerImageUrls),
+        ),
+      ],
     );
   }
 
@@ -109,6 +142,92 @@ class CashupPos {
     _container?.dispose();
     _container = null;
     _config = null;
+  }
+}
+
+Future<String?> _defaultTokenProvider() async =>
+    const String.fromEnvironment('CASHUP_POS_TOKEN');
+
+/// The complete SDK-owned application shell.
+///
+/// Pass this directly to `runApp` after [CashupPos.initialize]. Its provider
+/// scope, theme and navigator own every screen and nested SDK route.
+class CashupPosApp extends StatelessWidget {
+  const CashupPosApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!CashupPos.isInitialized) {
+      throw StateError(
+        'CashupPos.initialize() must be called before CashupPosApp is built.',
+      );
+    }
+
+    final config = CashupPos.config;
+    return UncontrolledProviderScope(
+      container: CashupPos.container,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: config.merchant.name,
+        theme: config.theme.toThemeData(Brightness.light),
+        darkTheme: config.theme.toThemeData(Brightness.dark),
+        home: const PosHomePage(),
+      ),
+    );
+  }
+}
+
+class _SdkDemoPaymentHandler implements PosPaymentHandler {
+  const _SdkDemoPaymentHandler();
+
+  @override
+  Set<String> get supportedMethods => const {'CARD'};
+
+  @override
+  Future<PosPaymentResult> pay({
+    required String method,
+    required double amount,
+    required String merchantTrxId,
+    int? transactionId,
+  }) async {
+    await Future<void>.delayed(const Duration(seconds: 2));
+    return PosPaymentResult.success(
+      reference: 'DEMO-$merchantTrxId',
+      approvalCode: '123456',
+      cardMasked: '4111 **** **** 1111',
+      raw: {'method': method, 'amount': amount},
+    );
+  }
+}
+
+class _SdkDemoQrisGateway implements QrisGateway {
+  final Map<String, int> _checks = {};
+
+  static const _demoQrString =
+      '00020101021226610016ID.CO.CASHUP.WWW0118936000000000000000'
+      '0215DEMO000000000005204599953033605802ID5909TOKO DEMO6007JAKARTA'
+      '6304ABCD';
+
+  @override
+  Future<QrisPayload> generate({
+    required double amount,
+    String? merchantTrxId,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    return QrisPayload(
+      qrString: _demoQrString,
+      invoiceNumber: 'DEMO-INV-${DateTime.now().millisecondsSinceEpoch}',
+    );
+  }
+
+  @override
+  Future<QrisStatus> checkStatus({
+    required String invoiceNumber,
+    String? merchantTrxId,
+  }) async {
+    final count = (_checks[invoiceNumber] ?? 0) + 1;
+    _checks[invoiceNumber] = count;
+    return count < 3 ? QrisStatus.pending : QrisStatus.paid;
   }
 }
 

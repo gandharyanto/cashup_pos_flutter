@@ -1,9 +1,8 @@
 # cashup_pos_example
 
-A demo host app for the `cashup_pos` SDK. It initializes the SDK, supplies a
-simulated card handler (`lib/demo_payment_handler.dart`) and QRIS gateway
-(`lib/demo_qris_gateway.dart`), and opens the POS screens through
-`CashupPosLauncher`.
+A minimal host for the `cashup_pos` SDK. It only supplies the POS colour
+theme, initializes the SDK, and runs the SDK-owned `CashupPosApp`. All screens,
+navigation and demo payment behavior live in the SDK.
 
 ```sh
 flutter run -d <device-id> \
@@ -11,11 +10,10 @@ flutter run -d <device-id> \
   --dart-define=CASHUP_POS_TOKEN=<jwt>
 ```
 
-You can also type the backend URL and token on the home screen. The
-catalogue and transactions need a reachable `/pos/*` backend. Android builds
-need `JAVA_HOME` pointing at JDK 17.
+The catalogue and transactions need a reachable `/pos/*` backend. Android
+builds need `JAVA_HOME` pointing at JDK 17.
 
-To tap through to the POS shell automatically on a device:
+To verify the POS shell automatically on a device:
 
 ```sh
 flutter test integration_test -d <device-id>

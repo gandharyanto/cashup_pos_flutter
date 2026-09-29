@@ -24,6 +24,7 @@ void main() {
     final exports = File('lib/cashup_pos.dart').readAsStringSync();
     for (final symbol in const [
       'CashupPos',
+      'CashupPosApp',
       'CashupPosLauncher',
       'PosConfig',
       'PosMerchant',

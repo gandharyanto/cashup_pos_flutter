@@ -30,10 +30,15 @@ class ProductBrowsePane extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final catalog = ref.watch(catalogControllerProvider);
+    final layout = PosLayout.of(context);
+    final bannerImageUrls = ref.watch(
+      posBannerImageUrlsProvider.select((urls) => urls),
+    );
     return AsyncView<CatalogState>(
       value: catalog,
       onRetry: () => ref.read(catalogControllerProvider.notifier).refresh(),
       data: (state) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -43,19 +48,39 @@ class ProductBrowsePane extends ConsumerWidget {
                   onChanged: ref
                       .read(catalogControllerProvider.notifier)
                       .setQuery,
-                  hintText: 'Cari produk',
+                  hintText: 'Cari makanan atau minuman',
                 ),
               ),
-              IconButton(
-                tooltip: state.isGrid ? 'Tampilan daftar' : 'Tampilan grid',
-                onPressed: ref
-                    .read(catalogControllerProvider.notifier)
-                    .toggleLayout,
-                icon: Icon(state.isGrid ? Icons.view_list : Icons.grid_view),
-              ),
+              if (!layout.isPhone) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: state.isGrid ? 'Tampilan daftar' : 'Tampilan grid',
+                  onPressed: ref
+                      .read(catalogControllerProvider.notifier)
+                      .toggleLayout,
+                  style: IconButton.styleFrom(
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
+                  ),
+                  icon: Icon(
+                    state.isGrid
+                        ? Icons.view_agenda_outlined
+                        : Icons.grid_view_rounded,
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          _PromoCarousel(imageUrls: bannerImageUrls),
+          const SizedBox(height: 16),
+          Text(
+            'Mau pesan apa hari ini?',
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.4),
+          ),
+          const SizedBox(height: 10),
           CategoryChipBar(
             categories: state.categories
                 .map((item) => (id: item.id, name: item.name))
@@ -65,14 +90,14 @@ class ProductBrowsePane extends ConsumerWidget {
                 .read(catalogControllerProvider.notifier)
                 .selectCategory,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           Expanded(
-            child: state.isGrid
+            child: state.isGrid && !layout.isPhone
                 ? GridView.builder(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: PosLayout.of(context).productGridColumns,
+                      crossAxisCount: layout.productGridColumns,
                       crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
+                      mainAxisSpacing: 12,
                       childAspectRatio: .72,
                     ),
                     itemCount: state.visibleProducts.length,
@@ -84,7 +109,7 @@ class ProductBrowsePane extends ConsumerWidget {
                   )
                 : ListView.separated(
                     itemCount: state.visibleProducts.length,
-                    separatorBuilder: (_, index) => const SizedBox(height: 8),
+                    separatorBuilder: (_, index) => const SizedBox(height: 12),
                     itemBuilder: (_, index) => _ProductEntry(
                       product: state.visibleProducts[index],
                       baseUrl: state.baseUrl,
@@ -92,6 +117,115 @@ class ProductBrowsePane extends ConsumerWidget {
                     ),
                   ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PromoCarousel extends StatefulWidget {
+  const _PromoCarousel({required this.imageUrls});
+
+  final List<String> imageUrls;
+
+  @override
+  State<_PromoCarousel> createState() => _PromoCarouselState();
+}
+
+class _PromoCarouselState extends State<_PromoCarousel> {
+  late final PageController _controller = PageController(viewportFraction: .94);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final validUrls = widget.imageUrls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toList(growable: false);
+    if (validUrls.isEmpty) return const _FoodPromoBanner();
+
+    return SizedBox(
+      height: 132,
+      child: PageView.builder(
+        controller: _controller,
+        padEnds: false,
+        itemCount: validUrls.length,
+        itemBuilder: (context, index) => Padding(
+          padding: EdgeInsets.only(
+            right: index == validUrls.length - 1 ? 0 : 10,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.network(
+              validUrls[index],
+              width: double.infinity,
+              height: 132,
+              fit: BoxFit.cover,
+              cacheWidth: 1200,
+              errorBuilder: (_, _, _) => const _FoodPromoBanner(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FoodPromoBanner extends StatelessWidget {
+  const _FoodPromoBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      decoration: BoxDecoration(
+        color: primary.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: primary, shape: BoxShape.circle),
+            child: Icon(
+              Icons.local_offer_rounded,
+              color: theme.colorScheme.onPrimary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ada yang enak buat kamu',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Pilih menu favorit dan cek promo yang tersedia',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: primary),
         ],
       ),
     );
@@ -125,6 +259,7 @@ class _ProductEntry extends ConsumerWidget {
       stockLabel: product.isUnlimitedStock ? null : 'Stok ${product.qty}',
       outOfStock: !product.isUnlimitedStock && product.qty <= 0,
       quantityInCart: quantity,
+      showAddAction: true,
       layout: layout,
       onTap: () => _add(context, ref),
     );

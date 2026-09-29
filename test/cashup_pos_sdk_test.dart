@@ -8,6 +8,33 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   tearDown(() async => CashupPos.dispose());
 
+  test('initialize uses the Tucanos Orca POS API by default', () async {
+    await CashupPos.initialize();
+
+    expect(CashupPos.config.baseUrl, 'https://tucanos-orca-pos.cashup.id/');
+  });
+
+  testWidgets('CashupPosApp owns nested navigation inside the SDK scope', (
+    tester,
+  ) async {
+    await CashupPos.initializeWithConfig(
+      PosConfig(
+        baseUrl: 'https://example.test/',
+        tokenProvider: () async => 'token',
+        merchant: const PosMerchant(name: 'Toko Uji'),
+      ),
+    );
+    CashupPos.container.read(posModeProvider.notifier).state = PosMode.simple;
+
+    await tester.pumpWidget(const CashupPosApp());
+    await tester.tap(find.byTooltip('Menu POS'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Menu POS'), findsOneWidget);
+    expect(find.text('Segarkan katalog'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     "CashupPosLauncher.open applies the host's PosTheme to the pushed page",
     (tester) async {
@@ -22,7 +49,7 @@ void main() {
         accentSuccess: Color(0xFF10B981),
       );
 
-      await CashupPos.initialize(
+      await CashupPos.initializeWithConfig(
         PosConfig(
           baseUrl: 'https://example.test/',
           tokenProvider: () async => 'token',

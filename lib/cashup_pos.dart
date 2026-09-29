@@ -6,7 +6,8 @@
 /// never leaks into the host-facing API by accident.
 library;
 
-export 'src/cashup_pos_sdk.dart' show CashupPos, CashupPosLauncher;
+export 'src/cashup_pos_sdk.dart'
+    show CashupPos, CashupPosApp, CashupPosLauncher;
 export 'src/config/pos_config.dart'
     show PosConfig, PosMerchant, PosFeatureFlags;
 export 'src/config/pos_theme.dart' show PosTheme;

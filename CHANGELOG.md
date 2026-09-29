@@ -22,18 +22,14 @@ Cashup POS (`feature/pos-asg-phase3` at `6990fbbb5`).
   rendering and 3-second polling, backed by a host-implemented
   `QrisGateway`. Card, EDC and CDCP are delegated to a host-implemented
   `PosPaymentHandler`.
-* **Host integration**: `CashupPos.initialize(PosConfig)`, the
+* **Host integration**: a theme-only `CashupPos.initialize`, the SDK-owned
+  `CashupPosApp`, advanced `CashupPos.initializeWithConfig(PosConfig)`, the
   `CashupPosLauncher` entry points, `PosTheme` design tokens,
   `PosFeatureFlags`, per-request token and header providers, and an
   `onTransactionCompleted` callback.
-* **Example host app** in `example/`, with a demo card handler and a demo
-  QRIS gateway.
+* **Minimal example app** in `example/`; it only supplies theme colours and
+  initializes the SDK. The complete UI and demo payment adapters live in the
+  SDK.
 
-### Known issues
-
-* Screens and dialogs that SDK pages open themselves (the POS menu, the
-  phone cart sheet, checkout, payment dialogs) are pushed onto the host's
-  `Navigator`, outside the SDK's provider scope, and fail with "No
-  ProviderScope found". Only the pages that `CashupPosLauncher` opens
-  directly work from a host app. The widget tests don't catch this because
-  they wrap the whole `MaterialApp` in a `ProviderScope`.
+`CashupPosApp` owns its navigator below the SDK provider scope, so nested POS
+screens and dialogs stay inside SDK state.

@@ -70,4 +70,33 @@ void main() {
 
     expect(container.read(cartControllerProvider).totalQuantity, 1);
   });
+
+  testWidgets('renders host supplied banner urls above the catalogue', (
+    tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        posRepositoryProvider.overrideWithValue(repository),
+        posBannerImageUrlsProvider.overrideWithValue(const [
+          'https://cdn.example.test/banner.jpg',
+        ]),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: ProductBrowsePage()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final banner = tester.widget<Image>(find.byType(Image).first);
+    expect(banner.image, isA<ResizeImage>());
+    final networkImage = (banner.image as ResizeImage).imageProvider;
+    expect(networkImage, isA<NetworkImage>());
+    expect((networkImage as NetworkImage).url, contains('banner.jpg'));
+  });
 }

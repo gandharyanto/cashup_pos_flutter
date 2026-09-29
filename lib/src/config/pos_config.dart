@@ -1,7 +1,7 @@
 /// Host-supplied configuration for the SDK.
 ///
-/// [PosConfig] is the single object a host builds and passes to
-/// `CashupPos.initialize`. It never reaches past the seams the package
+/// [PosConfig] is the object an advanced host passes to
+/// `CashupPos.initializeWithConfig`. It never reaches past the seams the package
 /// already defines: [PosPaymentHandler] / [QrisGateway] (Task 15) are the
 /// host's own implementations, and nothing here talks to [PosRepository] or
 /// `PosApiClient` directly — those are constructed from [baseUrl] /
@@ -58,7 +58,8 @@ class PosFeatureFlags {
 /// Everything the SDK needs from the host, gathered into one object.
 ///
 /// Construction never fails and never talks to the network — validation
-/// (e.g. base URL normalisation) happens once, in `CashupPos.initialize`,
+/// (e.g. base URL normalisation) happens once, in
+/// `CashupPos.initializeWithConfig`,
 /// so this class stays a plain, immutable data holder.
 class PosConfig {
   const PosConfig({
@@ -70,12 +71,13 @@ class PosConfig {
     this.theme = const PosTheme.cashup(),
     this.features = const PosFeatureFlags(),
     this.locale = const Locale('id', 'ID'),
+    this.bannerImageUrls = const [],
     this.extraHeaders,
     this.onTransactionCompleted,
   });
 
-  /// The `/pos/*` backend's base URL. `CashupPos.initialize` normalises a
-  /// missing trailing slash onto this before it is exposed via
+  /// The `/pos/*` backend's base URL. `CashupPos.initializeWithConfig`
+  /// normalises a missing trailing slash onto this before it is exposed via
   /// `CashupPos.config` or used to build the API client.
   final String baseUrl;
 
@@ -97,6 +99,11 @@ class PosConfig {
   final PosTheme theme;
   final PosFeatureFlags features;
   final Locale locale;
+
+  /// Remote promotional artwork shown above the catalogue. The host owns
+  /// both the images and their ordering; an empty list uses the SDK's
+  /// built-in promotional card instead.
+  final List<String> bannerImageUrls;
 
   /// Extra headers merged onto every request, alongside the bearer token —
   /// the Dart counterpart of the device-id / version-id / user-agent

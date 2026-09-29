@@ -31,6 +31,7 @@ class PosProductTile extends StatelessWidget {
     this.outOfStock = false,
     this.badgeLabel,
     this.quantityInCart = 0,
+    this.showAddAction = false,
     this.onTap,
     this.onLongPress,
     this.trailing,
@@ -45,6 +46,7 @@ class PosProductTile extends StatelessWidget {
   final bool outOfStock;
   final String? badgeLabel;
   final int quantityInCart;
+  final bool showAddAction;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final Widget? trailing;
@@ -71,6 +73,7 @@ class PosProductTile extends StatelessWidget {
         outOfStock: outOfStock,
         badgeLabel: badgeLabel,
         quantityInCart: quantityInCart,
+        showAddAction: showAddAction,
         onTap: onTap,
         onLongPress: onLongPress,
         trailing: trailing,
@@ -90,6 +93,7 @@ class _PosProductTileBody extends StatelessWidget {
     required this.outOfStock,
     required this.badgeLabel,
     required this.quantityInCart,
+    required this.showAddAction,
     required this.onTap,
     required this.onLongPress,
     required this.trailing,
@@ -104,6 +108,7 @@ class _PosProductTileBody extends StatelessWidget {
   final bool outOfStock;
   final String? badgeLabel;
   final int quantityInCart;
+  final bool showAddAction;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final Widget? trailing;
@@ -116,11 +121,19 @@ class _PosProductTileBody extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: InkWell(
         onTap: tappable ? onTap : null,
         onLongPress: tappable ? onLongPress : null,
         child: layout == ProductTileLayout.grid
             ? _buildGrid(context, theme)
+            : showAddAction
+            ? _buildFoodList(theme)
             : _buildList(context, theme),
       ),
     );
@@ -212,6 +225,113 @@ class _PosProductTileBody extends StatelessWidget {
     );
   }
 
+  Widget _buildFoodList(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 146,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (badgeLabel != null) ...[
+                    _Pill(
+                      label: badgeLabel!,
+                      background: theme.colorScheme.secondary,
+                      foreground: theme.colorScheme.onSecondary,
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                  Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (sku != null) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      sku!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  MoneyText(
+                    price,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (!outOfStock && stockLabel != null)
+                    Text(
+                      stockLabel!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          SizedBox(
+            width: 112,
+            child: Column(
+              children: [
+                Stack(
+                  children: [
+                    ImageThumb(
+                      url: imageUrl,
+                      width: 112,
+                      height: 104,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    if (outOfStock)
+                      const Positioned.fill(
+                        child: _OutOfStockOverlay(compact: true),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: double.infinity,
+                  height: 36,
+                  child: OutlinedButton(
+                    onPressed: outOfStock ? null : onTap,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      side: BorderSide(color: theme.colorScheme.primary),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Text(
+                      quantityInCart > 0
+                          ? '$quantityInCart ditambah'
+                          : 'Tambah',
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _details(ThemeData theme, {TextStyle? priceStyle}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,7 +360,18 @@ class _PosProductTileBody extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 4),
-        MoneyText(price, style: priceStyle),
+        Row(
+          children: [
+            Expanded(
+              child: MoneyText(
+                price,
+                style: priceStyle?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            if (showAddAction && !outOfStock)
+              _AddProductButton(quantity: quantityInCart, onPressed: onTap),
+          ],
+        ),
         // "Stok habis" itself is rendered once, in the image overlay
         // (`_OutOfStockOverlay`) below — not repeated here, so an
         // out-of-stock tile shows the label exactly once.
@@ -252,6 +383,50 @@ class _PosProductTileBody extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _AddProductButton extends StatelessWidget {
+  const _AddProductButton({required this.quantity, required this.onPressed});
+
+  final int quantity;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: true,
+      label: 'Tambah ke keranjang',
+      child: InkResponse(
+        onTap: onPressed,
+        radius: 22,
+        child: Container(
+          height: 32,
+          constraints: const BoxConstraints(minWidth: 32),
+          padding: EdgeInsets.symmetric(horizontal: quantity > 0 ? 9 : 0),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: theme.colorScheme.primary),
+          ),
+          child: quantity > 0
+              ? Text(
+                  '$quantity',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                )
+              : Icon(
+                  Icons.add_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 20,
+                ),
+        ),
+      ),
     );
   }
 }

@@ -34,6 +34,11 @@ final posConfigProvider = Provider<PosConfig>(
   ),
 );
 
+/// Host-owned catalogue banner URLs. It deliberately has an empty default so
+/// isolated widget tests and embedded catalogue panes do not require a full
+/// [PosConfig] override just to render.
+final posBannerImageUrlsProvider = Provider<List<String>>((ref) => const []);
+
 /// The Dio-backed client, built once per container from [posConfigProvider].
 final posApiClientProvider = Provider<PosApiClient>((ref) {
   final config = ref.watch(posConfigProvider);

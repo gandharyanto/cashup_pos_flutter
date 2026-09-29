@@ -1,45 +1,32 @@
 import 'package:cashup_pos/cashup_pos.dart';
-import 'package:cashup_pos_example/demo_payment_handler.dart';
-import 'package:cashup_pos_example/demo_qris_gateway.dart';
-import 'package:cashup_pos_example/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('home screen offers every launcher entry point', (tester) async {
-    await tester.pumpWidget(const DemoHostApp());
+  tearDown(CashupPos.dispose);
 
-    expect(find.text('Buka POS'), findsOneWidget);
-    expect(find.text('Riwayat Transaksi'), findsOneWidget);
-    expect(find.text('Kelola Produk'), findsOneWidget);
-    expect(find.text('Pengaturan Pembayaran'), findsOneWidget);
-    expect(find.byType(TextField), findsNWidgets(2));
-  });
-
-  test('DemoQrisGateway reports paid on the third status check', () async {
-    final gateway = DemoQrisGateway();
-    final payload = await gateway.generate(amount: 10000);
-
-    Future<QrisStatus> check() =>
-        gateway.checkStatus(invoiceNumber: payload.invoiceNumber);
-
-    expect(await check(), QrisStatus.pending);
-    expect(await check(), QrisStatus.pending);
-    expect(await check(), QrisStatus.paid);
-    expect(await check(), QrisStatus.paid);
-  });
-
-  test('DemoPaymentHandler approves supported payments', () async {
-    const handler = DemoPaymentHandler(delay: Duration.zero);
-
-    final result = await handler.pay(
-      method: 'CARD',
-      amount: 25000,
-      merchantTrxId: 'POS-1',
+  testWidgets('example renders the SDK-owned POS UI directly', (tester) async {
+    const theme = PosTheme(
+      shellBackground: Color(0xFF123456),
+      surface: Color(0xFFFFFFFF),
+      surfaceSoft: Color(0xFFF8FAFC),
+      textOnShell: Color(0xFFFFFFFF),
+      textPrimary: Color(0xFF0F172A),
+      textSecondary: Color(0xFF475569),
+      strokeSoft: Color(0xFFE2E8F0),
+      accentSuccess: Color(0xFF10B981),
     );
+    await CashupPos.initialize(theme: theme);
 
-    expect(handler.supportedMethods, contains('CARD'));
-    expect(result.isSuccess, isTrue);
-    expect(result.reference, 'DEMO-POS-1');
+    await tester.pumpWidget(const CashupPosApp());
+    await tester.pump();
+
+    expect(find.text('POS'), findsWidgets);
+    expect(find.byTooltip('Menu POS'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    expect(
+      Theme.of(tester.element(find.byTooltip('Menu POS'))).colorScheme.primary,
+      theme.shellBackground,
+    );
   });
 }
